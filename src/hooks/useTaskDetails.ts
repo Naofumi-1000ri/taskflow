@@ -1,0 +1,242 @@
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import {
+  getTask,
+  getTaskChecklists,
+  createChecklist,
+  updateChecklist,
+  deleteChecklist,
+  getTaskComments,
+  createComment,
+  subscribeToTaskComments,
+  getTaskAttachments,
+  createAttachment,
+  deleteAttachment,
+  subscribeToTaskAttachments,
+} from '@/lib/firebase/firestore';
+import { uploadFile, deleteFile } from '@/lib/firebase/storage';
+import type { Task, Checklist, ChecklistItem, Comment, Attachment } from '@/types';
+
+export function useTaskDetails(projectId: string | null, taskId: string | null) {
+  const [task, setTask] = useState<Task | null>(null);
+  const [checklists, setChecklists] = useState<Checklist[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch task details
+  useEffect(() => {
+    if (!projectId || !taskId) {
+      setTask(null);
+      setChecklists([]);
+      setComments([]);
+      setAttachments([]);
+      return;
+    }
+
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const [taskData, checklistsData, attachmentsData] = await Promise.all([
+          getTask(projectId, taskId),
+          getTaskChecklists(projectId, taskId),
+          getTaskAttachments(projectId, taskId),
+        ]);
+        setTask(taskData);
+        setChecklists(checklistsData);
+        setAttachments(attachmentsData);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+
+    // Subscribe to comments
+    const unsubscribeComments = subscribeToTaskComments(projectId, taskId, (comments) => {
+      setComments(comments);
+    });
+
+    // Subscribe to attachments
+    const unsubscribeAttachments = subscribeToTaskAttachments(projectId, taskId, (attachments) => {
+      setAttachments(attachments);
+    });
+
+    return () => {
+      unsubscribeComments();
+      unsubscribeAttachments();
+    };
+  }, [projectId, taskId]);
+
+  // Add checklist
+  const addChecklist = useCallback(
+    async (title: string) => {
+      if (!projectId || !taskId) return;
+      const maxOrder = Math.max(...checklists.map((c) => c.order), -1);
+      const checklistId = await createChecklist(projectId, taskId, {
+        title,
+        order: maxOrder + 1,
+        items: [],
+      });
+
+      // Refresh checklists
+      const updated = await getTaskChecklists(projectId, taskId);
+      setChecklists(updated);
+      return checklistId;
+    },
+    [projectId, taskId, checklists]
+  );
+
+  // Update checklist
+  const editChecklist = useCallback(
+    async (checklistId: string, data: Partial<Omit<Checklist, 'id' | 'taskId' | 'createdAt'>>) => {
+      if (!projectId || !taskId) return;
+      await updateChecklist(projectId, taskId, checklistId, data);
+
+      // Refresh checklists
+      const updated = await getTaskChecklists(projectId, taskId);
+      setChecklists(updated);
+    },
+    [projectId, taskId]
+  );
+
+  // Delete checklist
+  const removeChecklist = useCallback(
+    async (checklistId: string) => {
+      if (!projectId || !taskId) return;
+      await deleteChecklist(projectId, taskId, checklistId);
+      setChecklists((prev) => prev.filter((c) => c.id !== checklistId));
+    },
+    [projectId, taskId]
+  );
+
+  // Add checklist item
+  const addChecklistItem = useCallback(
+    async (checklistId: string, text: string) => {
+      if (!projectId || !taskId) return;
+      const checklist = checklists.find((c) => c.id === checklistId);
+      if (!checklist) return;
+
+      const newItem: ChecklistItem = {
+        id: crypto.randomUUID(),
+        text,
+        isChecked: false,
+        order: checklist.items.length,
+      };
+
+      await updateChecklist(projectId, taskId, checklistId, {
+        items: [...checklist.items, newItem],
+      });
+
+      // Refresh checklists
+      const updated = await getTaskChecklists(projectId, taskId);
+      setChecklists(updated);
+    },
+    [projectId, taskId, checklists]
+  );
+
+  // Toggle checklist item
+  const toggleChecklistItem = useCallback(
+    async (checklistId: string, itemId: string) => {
+      if (!projectId || !taskId) return;
+      const checklist = checklists.find((c) => c.id === checklistId);
+      if (!checklist) return;
+
+      const updatedItems = checklist.items.map((item) =>
+        item.id === itemId ? { ...item, isChecked: !item.isChecked } : item
+      );
+
+      await updateChecklist(projectId, taskId, checklistId, {
+        items: updatedItems,
+      });
+
+      // Optimistic update
+      setChecklists((prev) =>
+        prev.map((c) =>
+          c.id === checklistId ? { ...c, items: updatedItems } : c
+        )
+      );
+    },
+    [projectId, taskId, checklists]
+  );
+
+  // Delete checklist item
+  const removeChecklistItem = useCallback(
+    async (checklistId: string, itemId: string) => {
+      if (!projectId || !taskId) return;
+      const checklist = checklists.find((c) => c.id === checklistId);
+      if (!checklist) return;
+
+      const updatedItems = checklist.items.filter((item) => item.id !== itemId);
+
+      await updateChecklist(projectId, taskId, checklistId, {
+        items: updatedItems,
+      });
+
+      // Optimistic update
+      setChecklists((prev) =>
+        prev.map((c) =>
+          c.id === checklistId ? { ...c, items: updatedItems } : c
+        )
+      );
+    },
+    [projectId, taskId, checklists]
+  );
+
+  // Add comment
+  const addComment = useCallback(
+    async (content: string, authorId: string, mentions: string[] = []) => {
+      if (!projectId || !taskId) return;
+      await createComment(projectId, taskId, {
+        content,
+        authorId,
+        mentions,
+      });
+    },
+    [projectId, taskId]
+  );
+
+  // Upload attachment
+  const uploadAttachment = useCallback(
+    async (file: File, uploadedBy: string) => {
+      if (!projectId || !taskId) return;
+      const fileData = await uploadFile(projectId, taskId, file);
+      await createAttachment(projectId, taskId, {
+        name: fileData.name,
+        url: fileData.url,
+        type: fileData.type,
+        size: fileData.size,
+        uploadedBy,
+      });
+    },
+    [projectId, taskId]
+  );
+
+  // Remove attachment
+  const removeAttachment = useCallback(
+    async (attachmentId: string, fileName: string) => {
+      if (!projectId || !taskId) return;
+      await deleteAttachment(projectId, taskId, attachmentId);
+      await deleteFile(projectId, taskId, fileName);
+    },
+    [projectId, taskId]
+  );
+
+  return {
+    task,
+    checklists,
+    comments,
+    attachments,
+    isLoading,
+    addChecklist,
+    editChecklist,
+    removeChecklist,
+    addChecklistItem,
+    toggleChecklistItem,
+    removeChecklistItem,
+    addComment,
+    uploadAttachment,
+    removeAttachment,
+  };
+}

@@ -1,0 +1,159 @@
+// User types
+export interface User {
+  id: string;
+  displayName: string;
+  email: string;
+  photoURL: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Project types
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  ownerId: string;
+  memberIds: string[];
+  isArchived: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ProjectMember {
+  userId: string;
+  role: 'admin' | 'editor' | 'viewer';
+  joinedAt: Date;
+}
+
+export type ProjectRole = 'admin' | 'editor' | 'viewer';
+
+// List types
+export interface List {
+  id: string;
+  projectId: string;
+  name: string;
+  color: string;
+  order: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Task types
+export interface Task {
+  id: string;
+  projectId: string;
+  listId: string;
+  title: string;
+  description: string;
+  order: number;
+  assigneeIds: string[];
+  labelIds: string[];
+  priority: Priority | null;
+  startDate: Date | null;
+  dueDate: Date | null;
+  isCompleted: boolean;
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type Priority = 'high' | 'medium' | 'low';
+
+// Checklist types
+export interface Checklist {
+  id: string;
+  taskId: string;
+  title: string;
+  order: number;
+  items: ChecklistItem[];
+  createdAt: Date;
+}
+
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  isChecked: boolean;
+  order: number;
+}
+
+// Comment types
+export interface Comment {
+  id: string;
+  taskId: string;
+  content: string;
+  authorId: string;
+  mentions: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Attachment types
+export interface Attachment {
+  id: string;
+  taskId: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+  uploadedBy: string;
+  uploadedAt: Date;
+}
+
+// Label types
+export interface Label {
+  id: string;
+  projectId: string;
+  name: string;
+  color: string;
+  createdAt: Date;
+}
+
+// Notification types
+export interface Notification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  projectId: string;
+  taskId: string | null;
+  isRead: boolean;
+  createdAt: Date;
+  data: Record<string, unknown>;
+}
+
+export type NotificationType =
+  | 'task_assigned'
+  | 'task_updated'
+  | 'comment_added'
+  | 'mentioned'
+  | 'due_reminder';
+
+// Label color presets
+export const LABEL_COLORS = [
+  { name: 'red', value: '#ef4444' },
+  { name: 'orange', value: '#f97316' },
+  { name: 'yellow', value: '#eab308' },
+  { name: 'green', value: '#22c55e' },
+  { name: 'blue', value: '#3b82f6' },
+  { name: 'purple', value: '#8b5cf6' },
+  { name: 'pink', value: '#ec4899' },
+  { name: 'gray', value: '#6b7280' },
+] as const;
+
+// List color presets
+export const LIST_COLORS = [
+  { name: 'slate', value: '#64748b' },
+  { name: 'red', value: '#ef4444' },
+  { name: 'orange', value: '#f97316' },
+  { name: 'amber', value: '#f59e0b' },
+  { name: 'green', value: '#22c55e' },
+  { name: 'teal', value: '#14b8a6' },
+  { name: 'blue', value: '#3b82f6' },
+  { name: 'indigo', value: '#6366f1' },
+  { name: 'purple', value: '#8b5cf6' },
+  { name: 'pink', value: '#ec4899' },
+] as const;

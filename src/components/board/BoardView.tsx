@@ -1,0 +1,288 @@
+'use client';
+
+import { useState, useCallback } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragStartEvent,
+  type DragEndEvent,
+  type DragOverEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  horizontalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { BoardList } from './BoardList';
+import { TaskCard } from './TaskCard';
+import { useBoard } from '@/hooks/useBoard';
+import { useAuthStore } from '@/stores/authStore';
+import type { Task } from '@/types';
+import { LIST_COLORS } from '@/types';
+import { cn } from '@/lib/utils';
+import { Loader2 } from 'lucide-react';
+
+interface BoardViewProps {
+  projectId: string;
+  onTaskClick: (taskId: string) => void;
+}
+
+export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
+  const { firebaseUser } = useAuthStore();
+  const {
+    lists,
+    tasks,
+    labels,
+    isLoading,
+    getTasksByListId,
+    addList,
+    editList,
+    removeList,
+    addTask,
+    editTask,
+    moveTask,
+    reorderTasks,
+  } = useBoard(projectId);
+
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [isAddingList, setIsAddingList] = useState(false);
+  const [newListName, setNewListName] = useState('');
+  const [newListColor, setNewListColor] = useState<string>(LIST_COLORS[0].value);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      const { active } = event;
+      const task = tasks.find((t) => t.id === active.id);
+      if (task) {
+        setActiveTask(task);
+      }
+    },
+    [tasks]
+  );
+
+  const handleDragOver = useCallback(
+    (event: DragOverEvent) => {
+      const { active, over } = event;
+      if (!over) return;
+
+      const activeId = active.id as string;
+      const overId = over.id as string;
+
+      // Find the active task
+      const activeTask = tasks.find((t) => t.id === activeId);
+      if (!activeTask) return;
+
+      // Check if dropping over a list
+      if (overId.startsWith('list-')) {
+        const newListId = overId.replace('list-', '');
+        if (activeTask.listId !== newListId) {
+          // Move to new list
+          const tasksInNewList = getTasksByListId(newListId);
+          moveTask(activeId, newListId, tasksInNewList.length);
+        }
+        return;
+      }
+
+      // Dropping over another task
+      const overTask = tasks.find((t) => t.id === overId);
+      if (!overTask) return;
+
+      if (activeTask.listId !== overTask.listId) {
+        // Move to different list
+        const tasksInNewList = getTasksByListId(overTask.listId);
+        const overIndex = tasksInNewList.findIndex((t) => t.id === overId);
+        moveTask(activeId, overTask.listId, overIndex);
+      }
+    },
+    [tasks, getTasksByListId, moveTask]
+  );
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      setActiveTask(null);
+
+      if (!over) return;
+
+      const activeId = active.id as string;
+      const overId = over.id as string;
+
+      if (activeId === overId) return;
+
+      const activeTask = tasks.find((t) => t.id === activeId);
+      const overTask = tasks.find((t) => t.id === overId);
+
+      if (!activeTask) return;
+
+      // If both tasks are in the same list, reorder
+      if (overTask && activeTask.listId === overTask.listId) {
+        const listTasks = getTasksByListId(activeTask.listId);
+        const activeIndex = listTasks.findIndex((t) => t.id === activeId);
+        const overIndex = listTasks.findIndex((t) => t.id === overId);
+
+        if (activeIndex !== overIndex) {
+          const reordered = arrayMove(listTasks, activeIndex, overIndex);
+          reorderTasks(
+            activeTask.listId,
+            reordered.map((t) => t.id)
+          );
+        }
+      }
+    },
+    [tasks, getTasksByListId, reorderTasks]
+  );
+
+  const handleAddList = () => {
+    if (newListName.trim()) {
+      addList(newListName.trim(), newListColor);
+      setNewListName('');
+      setNewListColor(LIST_COLORS[0].value);
+      setIsAddingList(false);
+    }
+  };
+
+  const handleAddTask = (listId: string) => (title: string) => {
+    if (firebaseUser) {
+      addTask(listId, title, firebaseUser.uid);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="flex h-full gap-4 overflow-x-auto pb-4" data-testid="board-view">
+        <SortableContext
+          items={lists.map((l) => l.id)}
+          strategy={horizontalListSortingStrategy}
+        >
+          {lists.map((list) => (
+            <BoardList
+              key={list.id}
+              list={list}
+              tasks={getTasksByListId(list.id)}
+              labels={labels}
+              onAddTask={handleAddTask(list.id)}
+              onEditList={(data) => editList(list.id, data)}
+              onDeleteList={() => {
+                if (confirm('このリストを削除しますか？')) {
+                  removeList(list.id);
+                }
+              }}
+              onTaskClick={onTaskClick}
+            />
+          ))}
+        </SortableContext>
+
+        {/* Add List */}
+        <div className="flex w-72 flex-shrink-0">
+          {isAddingList ? (
+            <div className="w-full rounded-lg bg-gray-100 p-3">
+              <Input
+                value={newListName}
+                onChange={(e) => setNewListName(e.target.value)}
+                placeholder="リスト名を入力..."
+                className="mb-2"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAddList();
+                  if (e.key === 'Escape') {
+                    setNewListName('');
+                    setIsAddingList(false);
+                  }
+                }}
+              />
+              <div className="mb-2 flex flex-wrap gap-1">
+                {LIST_COLORS.map((color) => (
+                  <button
+                    key={color.value}
+                    onClick={() => setNewListColor(color.value)}
+                    className={cn(
+                      'h-5 w-5 rounded-full transition-transform hover:scale-110',
+                      newListColor === color.value &&
+                        'ring-2 ring-offset-1 ring-primary'
+                    )}
+                    style={{ backgroundColor: color.value }}
+                  />
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={handleAddList}>
+                  追加
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setNewListName('');
+                    setIsAddingList(false);
+                  }}
+                >
+                  キャンセル
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              className="h-auto w-full justify-start border-dashed py-6"
+              onClick={() => setIsAddingList(true)}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              リストを追加
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Drag Overlay */}
+      <DragOverlay>
+        {activeTask && (
+          <TaskCard
+            task={activeTask}
+            labels={labels.filter((l) => activeTask.labelIds.includes(l.id))}
+            onClick={() => {}}
+            isDragging
+          />
+        )}
+      </DragOverlay>
+    </DndContext>
+  );
+}
