@@ -132,9 +132,11 @@ export default function ProjectSettingsPage() {
 
     try {
       // Check if user exists
+      console.log('[Invite] Searching for user:', inviteEmail.trim());
       const user = await getUserByEmail(inviteEmail.trim());
+      console.log('[Invite] Search result:', user);
       if (!user) {
-        setInviteError('このメールアドレスのユーザーが見つかりません。先にログインしてもらってください。');
+        setInviteError(`「${inviteEmail.trim()}」が見つかりません。このメールアドレスでログインしてからお試しください。`);
         return;
       }
 

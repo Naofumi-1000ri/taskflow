@@ -761,11 +761,38 @@ export async function getAllUsers(): Promise<User[]> {
 
 export async function getUserByEmail(email: string): Promise<User | null> {
   const db = getFirebaseDb();
-  const q = query(collection(db, 'users'), where('email', '==', email));
-  const snapshot = await getDocs(q);
+  const normalizedEmail = email.toLowerCase().trim();
+
+  // First try exact match
+  let q = query(collection(db, 'users'), where('email', '==', normalizedEmail));
+  let snapshot = await getDocs(q);
+
+  // If not found, try original email (in case stored with different case)
   if (snapshot.empty) {
+    q = query(collection(db, 'users'), where('email', '==', email.trim()));
+    snapshot = await getDocs(q);
+  }
+
+  // If still not found, search all users and compare case-insensitively
+  if (snapshot.empty) {
+    const allUsersSnapshot = await getDocs(collection(db, 'users'));
+    const matchingDoc = allUsersSnapshot.docs.find(
+      (doc) => doc.data().email?.toLowerCase() === normalizedEmail
+    );
+    if (matchingDoc) {
+      const data = matchingDoc.data();
+      return {
+        id: matchingDoc.id,
+        displayName: data.displayName,
+        email: data.email,
+        photoURL: data.photoURL,
+        createdAt: toDate(data.createdAt),
+        updatedAt: toDate(data.updatedAt),
+      } as User;
+    }
     return null;
   }
+
   const doc = snapshot.docs[0];
   const data = doc.data();
   return {
