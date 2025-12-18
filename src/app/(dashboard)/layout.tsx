@@ -7,6 +7,8 @@ import { Header } from '@/components/common/Header';
 import { Sidebar } from '@/components/common/Sidebar';
 import { ProjectFormModal } from '@/components/project/ProjectFormModal';
 import { Loader2 } from 'lucide-react';
+import { useUIStore } from '@/stores/uiStore';
+import { cn } from '@/lib/utils';
 
 export default function DashboardLayout({
   children,
@@ -15,6 +17,7 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
+  const { isSidebarOpen, isSidebarCollapsed } = useUIStore();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -35,11 +38,16 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex h-screen min-w-[480px] flex-col overflow-hidden">
       <Header />
-      <div className="flex flex-1">
+      <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <main className="flex-1 overflow-auto bg-gray-50 p-4 lg:p-6">
+        <main
+          className={cn(
+            'flex min-h-0 flex-1 flex-col overflow-hidden bg-gray-50 p-4 lg:ml-0 lg:p-6',
+            isSidebarOpen && (isSidebarCollapsed ? 'ml-16' : 'ml-64')
+          )}
+        >
           {children}
         </main>
       </div>

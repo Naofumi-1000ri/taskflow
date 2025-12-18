@@ -13,6 +13,7 @@ import {
   serverTimestamp,
   writeBatch,
   Timestamp,
+  documentId,
   type DocumentData,
   type QueryConstraint,
 } from 'firebase/firestore';
@@ -23,10 +24,13 @@ import type {
   List,
   Task,
   Label,
+  Tag,
   Comment,
   Checklist,
   Attachment,
+  User,
 } from '@/types';
+import { DEFAULT_TAGS } from '@/types';
 
 // Helper to convert Firestore timestamp to Date
 function toDate(timestamp: Timestamp | null | undefined): Date {
@@ -84,6 +88,17 @@ export async function createProject(
       createdAt: serverTimestamp(),
     });
   });
+
+  // Create default tags
+  DEFAULT_TAGS.forEach((tag, index) => {
+    const tagRef = doc(collection(db, 'projects', projectRef.id, 'tags'));
+    batch.set(tagRef, {
+      ...tag,
+      order: index,
+      createdAt: serverTimestamp(),
+    });
+  });
+
   await batch.commit();
 
   return projectRef.id;
@@ -468,6 +483,78 @@ export function subscribeToProjectLabels(
   );
 }
 
+// ==================== Tags ====================
+
+export async function createTag(
+  projectId: string,
+  data: Omit<Tag, 'id' | 'projectId' | 'createdAt'>
+): Promise<string> {
+  const db = getFirebaseDb();
+  const tagRef = await addDoc(
+    collection(db, 'projects', projectId, 'tags'),
+    {
+      ...data,
+      projectId,
+      createdAt: serverTimestamp(),
+    }
+  );
+  return tagRef.id;
+}
+
+export async function updateTag(
+  projectId: string,
+  tagId: string,
+  data: Partial<Omit<Tag, 'id' | 'projectId' | 'createdAt'>>
+): Promise<void> {
+  const db = getFirebaseDb();
+  await updateDoc(doc(db, 'projects', projectId, 'tags', tagId), data);
+}
+
+export async function deleteTag(
+  projectId: string,
+  tagId: string
+): Promise<void> {
+  const db = getFirebaseDb();
+  await deleteDoc(doc(db, 'projects', projectId, 'tags', tagId));
+}
+
+export async function getProjectTags(projectId: string): Promise<Tag[]> {
+  const db = getFirebaseDb();
+  const q = query(
+    collection(db, 'projects', projectId, 'tags'),
+    orderBy('order', 'asc')
+  );
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    projectId,
+    ...doc.data(),
+    createdAt: toDate(doc.data().createdAt),
+  })) as Tag[];
+}
+
+export function subscribeToProjectTags(
+  projectId: string,
+  callback: (tags: Tag[]) => void
+): () => void {
+  const db = getFirebaseDb();
+  const q = query(
+    collection(db, 'projects', projectId, 'tags'),
+    orderBy('order', 'asc')
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const tags = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      projectId,
+      ...doc.data(),
+      createdAt: toDate(doc.data().createdAt),
+    })) as Tag[];
+    callback(tags);
+  });
+}
+
 // ==================== Comments ====================
 
 export async function createComment(
@@ -651,5 +738,73 @@ export function subscribeToTaskAttachments(
       uploadedAt: toDate(doc.data().uploadedAt),
     })) as Attachment[];
     callback(attachments);
+  });
+}
+
+// ==================== Users ====================
+
+export async function getUsersByIds(userIds: string[]): Promise<User[]> {
+  if (userIds.length === 0) return [];
+
+  const db = getFirebaseDb();
+  // Firestore 'in' query has a limit of 30 items
+  const chunks: string[][] = [];
+  for (let i = 0; i < userIds.length; i += 30) {
+    chunks.push(userIds.slice(i, i + 30));
+  }
+
+  const users: User[] = [];
+  for (const chunk of chunks) {
+    const q = query(
+      collection(db, 'users'),
+      where(documentId(), 'in', chunk)
+    );
+    const snapshot = await getDocs(q);
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      users.push({
+        id: doc.id,
+        displayName: data.displayName,
+        email: data.email,
+        photoURL: data.photoURL,
+        createdAt: toDate(data.createdAt),
+        updatedAt: toDate(data.updatedAt),
+      });
+    });
+  }
+
+  return users;
+}
+
+export function subscribeToUsers(
+  userIds: string[],
+  callback: (users: User[]) => void
+): () => void {
+  if (userIds.length === 0) {
+    callback([]);
+    return () => {};
+  }
+
+  const db = getFirebaseDb();
+  // For simplicity, only subscribe to first 30 users
+  const limitedIds = userIds.slice(0, 30);
+  const q = query(
+    collection(db, 'users'),
+    where(documentId(), 'in', limitedIds)
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const users = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        displayName: data.displayName,
+        email: data.email,
+        photoURL: data.photoURL,
+        createdAt: toDate(data.createdAt),
+        updatedAt: toDate(data.updatedAt),
+      } as User;
+    });
+    callback(users);
   });
 }

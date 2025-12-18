@@ -23,13 +23,15 @@ import {
 } from '@/components/ui/popover';
 import { TaskCard } from './TaskCard';
 import { cn } from '@/lib/utils';
-import type { List, Task, Label } from '@/types';
+import type { List, Task, Label, Tag } from '@/types';
 import { LIST_COLORS } from '@/types';
 
 interface BoardListProps {
+  projectId: string;
   list: List;
   tasks: Task[];
   labels: Label[];
+  tags: Tag[];
   onAddTask: (title: string) => void;
   onEditList: (data: { name?: string; color?: string }) => void;
   onDeleteList: () => void;
@@ -37,9 +39,11 @@ interface BoardListProps {
 }
 
 export function BoardList({
+  projectId,
   list,
   tasks,
   labels,
+  tags,
   onAddTask,
   onEditList,
   onDeleteList,
@@ -99,13 +103,13 @@ export function BoardList({
   return (
     <div
       className={cn(
-        'flex w-72 flex-shrink-0 flex-col rounded-lg bg-gray-100 transition-colors',
+        'flex h-full max-h-full min-h-0 w-72 flex-shrink-0 flex-col rounded-lg bg-gray-100 transition-colors',
         isOver && 'bg-gray-200'
       )}
       data-testid="board-list"
     >
       {/* List Header */}
-      <div className="flex items-center justify-between p-3 pb-0">
+      <div className="flex flex-shrink-0 items-center justify-between p-3 pb-2">
         <div className="flex items-center gap-2">
           <div
             className="h-3 w-3 rounded-full"
@@ -173,30 +177,10 @@ export function BoardList({
         </DropdownMenu>
       </div>
 
-      {/* Tasks */}
-      <div
-        ref={setNodeRef}
-        className="flex-1 space-y-2 overflow-y-auto p-3"
-      >
-        <SortableContext
-          items={tasks.map((t) => t.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          {tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              labels={labels}
-              onClick={() => onTaskClick(task.id)}
-            />
-          ))}
-        </SortableContext>
-      </div>
-
-      {/* Add Task */}
-      <div className="p-3 pt-0">
+      {/* Add Task - At Top */}
+      <div className="flex-shrink-0 px-3 pb-2">
         {isAddingTask ? (
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-lg border bg-white p-2">
             <Input
               value={newTaskTitle}
               onChange={(e) => setNewTaskTitle(e.target.value)}
@@ -223,13 +207,35 @@ export function BoardList({
         ) : (
           <Button
             variant="ghost"
-            className="w-full justify-start text-muted-foreground"
+            className="w-full justify-start text-primary hover:text-primary"
             onClick={() => setIsAddingTask(true)}
           >
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="mr-1 h-4 w-4" />
             タスクを追加
           </Button>
         )}
+      </div>
+
+      {/* Tasks */}
+      <div
+        ref={setNodeRef}
+        className="board-list-scroll min-h-0 flex-1 space-y-2 px-3 pb-3"
+      >
+        <SortableContext
+          items={tasks.map((t) => t.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          {tasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              projectId={projectId}
+              task={task}
+              labels={labels}
+              tags={tags}
+              onClick={() => onTaskClick(task.id)}
+            />
+          ))}
+        </SortableContext>
       </div>
     </div>
   );

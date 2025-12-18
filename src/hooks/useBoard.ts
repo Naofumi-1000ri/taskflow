@@ -14,13 +14,15 @@ import {
   subscribeToProjectTasks,
   getProjectLabels,
   subscribeToProjectLabels,
+  subscribeToProjectTags,
 } from '@/lib/firebase/firestore';
-import type { List, Task, Label } from '@/types';
+import type { List, Task, Label, Tag } from '@/types';
 
 interface BoardState {
   lists: List[];
   tasks: Task[];
   labels: Label[];
+  tags: Tag[];
   isLoading: boolean;
   error: Error | null;
 }
@@ -30,6 +32,7 @@ export function useBoard(projectId: string | null) {
     lists: [],
     tasks: [],
     labels: [],
+    tags: [],
     isLoading: true,
     error: null,
   });
@@ -37,11 +40,15 @@ export function useBoard(projectId: string | null) {
   // Subscribe to lists, tasks, and labels
   useEffect(() => {
     if (!projectId) {
-      setState((prev) => ({ ...prev, isLoading: false }));
+      Promise.resolve().then(() => {
+        setState((prev) => ({ ...prev, isLoading: false }));
+      });
       return;
     }
 
-    setState((prev) => ({ ...prev, isLoading: true }));
+    Promise.resolve().then(() => {
+      setState((prev) => ({ ...prev, isLoading: true }));
+    });
 
     const unsubscribeLists = subscribeToProjectLists(projectId, (lists) => {
       setState((prev) => ({ ...prev, lists }));
@@ -55,10 +62,15 @@ export function useBoard(projectId: string | null) {
       setState((prev) => ({ ...prev, labels }));
     });
 
+    const unsubscribeTags = subscribeToProjectTags(projectId, (tags) => {
+      setState((prev) => ({ ...prev, tags }));
+    });
+
     return () => {
       unsubscribeLists();
       unsubscribeTasks();
       unsubscribeLabels();
+      unsubscribeTags();
     };
   }, [projectId]);
 
@@ -129,6 +141,7 @@ export function useBoard(projectId: string | null) {
         order: maxOrder + 1,
         assigneeIds: [],
         labelIds: [],
+        tagIds: [],
         priority: null,
         startDate: null,
         dueDate: null,
@@ -188,6 +201,7 @@ export function useBoard(projectId: string | null) {
     lists: state.lists,
     tasks: state.tasks,
     labels: state.labels,
+    tags: state.tags,
     isLoading: state.isLoading,
     error: state.error,
     getTasksByListId,

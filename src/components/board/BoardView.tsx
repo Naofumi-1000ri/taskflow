@@ -22,11 +22,6 @@ import {
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { BoardList } from './BoardList';
 import { TaskCard } from './TaskCard';
 import { useBoard } from '@/hooks/useBoard';
@@ -47,13 +42,13 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
     lists,
     tasks,
     labels,
+    tags,
     isLoading,
     getTasksByListId,
     addList,
     editList,
     removeList,
     addTask,
-    editTask,
     moveTask,
     reorderTasks,
   } = useBoard(projectId);
@@ -188,31 +183,34 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex h-full gap-4 overflow-x-auto pb-4" data-testid="board-view">
-        <SortableContext
-          items={lists.map((l) => l.id)}
-          strategy={horizontalListSortingStrategy}
-        >
-          {lists.map((list) => (
-            <BoardList
-              key={list.id}
-              list={list}
-              tasks={getTasksByListId(list.id)}
-              labels={labels}
-              onAddTask={handleAddTask(list.id)}
-              onEditList={(data) => editList(list.id, data)}
-              onDeleteList={() => {
-                if (confirm('このリストを削除しますか？')) {
-                  removeList(list.id);
-                }
-              }}
-              onTaskClick={onTaskClick}
-            />
-          ))}
-        </SortableContext>
+      <div className="h-full min-h-0 overflow-x-auto pb-4" data-testid="board-view">
+        <div className="flex h-full min-w-max gap-4">
+          <SortableContext
+            items={lists.map((l) => l.id)}
+            strategy={horizontalListSortingStrategy}
+          >
+            {lists.map((list) => (
+              <BoardList
+                key={list.id}
+                projectId={projectId}
+                list={list}
+                tasks={getTasksByListId(list.id)}
+                labels={labels}
+                tags={tags}
+                onAddTask={handleAddTask(list.id)}
+                onEditList={(data) => editList(list.id, data)}
+                onDeleteList={() => {
+                  if (confirm('このリストを削除しますか？')) {
+                    removeList(list.id);
+                  }
+                }}
+                onTaskClick={onTaskClick}
+              />
+            ))}
+          </SortableContext>
 
-        {/* Add List */}
-        <div className="flex w-72 flex-shrink-0">
+          {/* Add List */}
+          <div className="flex w-72 flex-shrink-0">
           {isAddingList ? (
             <div className="w-full rounded-lg bg-gray-100 p-3">
               <Input
@@ -271,6 +269,7 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
               リストを追加
             </Button>
           )}
+          </div>
         </div>
       </div>
 
@@ -278,8 +277,10 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
       <DragOverlay>
         {activeTask && (
           <TaskCard
+            projectId={projectId}
             task={activeTask}
             labels={labels.filter((l) => activeTask.labelIds.includes(l.id))}
+            tags={tags.filter((t) => activeTask.tagIds?.includes(t.id))}
             onClick={() => {}}
             isDragging
           />

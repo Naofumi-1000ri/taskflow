@@ -48,8 +48,8 @@ export function Header() {
         <span className="hidden font-semibold md:inline-block">TaskFlow</span>
       </div>
 
-      <div className="flex-1">
-        <form className="hidden md:block">
+      <div className="min-w-0 flex-1">
+        <form>
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input

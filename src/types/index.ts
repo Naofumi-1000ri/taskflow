@@ -51,6 +51,7 @@ export interface Task {
   order: number;
   assigneeIds: string[];
   labelIds: string[];
+  tagIds: string[];
   priority: Priority | null;
   startDate: Date | null;
   dueDate: Date | null;
@@ -61,6 +62,16 @@ export interface Task {
 }
 
 export type Priority = 'high' | 'medium' | 'low';
+
+// Tag types (project-level status tags)
+export interface Tag {
+  id: string;
+  projectId: string;
+  name: string;
+  color: string;
+  order: number;
+  createdAt: Date;
+}
 
 // Checklist types
 export interface Checklist {
@@ -156,4 +167,24 @@ export const LIST_COLORS = [
   { name: 'indigo', value: '#6366f1' },
   { name: 'purple', value: '#8b5cf6' },
   { name: 'pink', value: '#ec4899' },
+] as const;
+
+// Tag color presets
+export const TAG_COLORS = [
+  { name: 'blue', value: '#3b82f6' },
+  { name: 'orange', value: '#f97316' },
+  { name: 'green', value: '#22c55e' },
+  { name: 'red', value: '#ef4444' },
+  { name: 'purple', value: '#8b5cf6' },
+  { name: 'pink', value: '#ec4899' },
+  { name: 'teal', value: '#14b8a6' },
+  { name: 'gray', value: '#6b7280' },
+] as const;
+
+// Default tags for new projects
+export const DEFAULT_TAGS = [
+  { name: '進行中', color: '#3b82f6' },
+  { name: '指示待ち', color: '#f97316' },
+  { name: '完了', color: '#22c55e' },
+  { name: '確認中', color: '#ef4444' },
 ] as const;

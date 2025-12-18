@@ -42,7 +42,7 @@ export default function BoardPage() {
   }, [selectedTaskId, removeTask]);
 
   return (
-    <>
+    <div className="h-full min-h-0">
       <BoardView projectId={projectId} onTaskClick={handleTaskClick} />
       <TaskDetailModal
         task={selectedTask}
@@ -54,6 +54,6 @@ export default function BoardPage() {
         onUpdate={handleUpdateTask}
         onDelete={handleDeleteTask}
       />
-    </>
+    </div>
   );
 }

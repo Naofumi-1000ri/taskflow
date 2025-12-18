@@ -31,7 +31,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'fixed inset-y-0 left-0 z-40 flex flex-col border-r bg-background transition-all duration-300 lg:static',
+        'fixed inset-y-0 left-0 z-40 flex min-h-0 flex-col border-r bg-background transition-all duration-300 lg:static lg:h-full',
         isSidebarCollapsed ? 'w-16' : 'w-64'
       )}
     >
@@ -54,7 +54,7 @@ export function Sidebar() {
         </Button>
       </div>
 
-      <ScrollArea className="flex-1 px-2 py-4">
+      <ScrollArea className="min-h-0 flex-1 px-2 py-4">
         <nav className="flex flex-col gap-1">
           {navigation.map((item) => {
             const isActive = pathname === item.href;
@@ -125,7 +125,7 @@ export function Sidebar() {
         </div>
       </ScrollArea>
 
-      <div className="border-t p-2">
+      <div className="flex-shrink-0 border-t p-2">
         <Link
           href="/settings"
           className={cn(

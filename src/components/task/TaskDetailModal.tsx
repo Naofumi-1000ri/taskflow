@@ -32,22 +32,25 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Calendar as CalendarIcon,
-  User,
-  Tag,
+  Tag as TagIcon,
+  Bookmark,
   ListChecks,
   Trash2,
-  Plus,
   X,
   ChevronUp,
   ChevronDown,
-  Send,
   Star,
   Flag,
+  Plus,
+  Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTaskDetails } from '@/hooks/useTaskDetails';
 import { useAuthStore } from '@/stores/authStore';
-import type { Task, Label as LabelType, List, Priority, Checklist } from '@/types';
+import { getProject, getProjectTags, createTag } from '@/lib/firebase/firestore';
+import { AssigneeSelector } from './AssigneeSelector';
+import type { Task, Label as LabelType, Tag as TagType, List, Priority, Checklist } from '@/types';
+import { TAG_COLORS } from '@/types';
 
 interface TaskDetailModalProps {
   task: Task | null;
@@ -92,25 +95,52 @@ export function TaskDetailModal({
   const [isCompleted, setIsCompleted] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [expandedChecklists, setExpandedChecklists] = useState<Set<string>>(new Set());
+  const [projectMemberIds, setProjectMemberIds] = useState<string[]>([]);
+  const [projectTags, setProjectTags] = useState<TagType[]>([]);
+  const [isAddingTag, setIsAddingTag] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
+  const [newTagColor, setNewTagColor] = useState<string>(TAG_COLORS[0].value);
+
+  // Fetch project members
+  useEffect(() => {
+    if (projectId) {
+      getProject(projectId).then((project) => {
+        if (project) {
+          setProjectMemberIds(project.memberIds);
+        }
+      });
+    }
+  }, [projectId]);
+
+  // Fetch project tags
+  useEffect(() => {
+    if (projectId) {
+      getProjectTags(projectId).then(setProjectTags);
+    }
+  }, [projectId]);
 
   // Initialize form when task changes
   useEffect(() => {
     if (task) {
-      setTitle(task.title);
-      setDescription(task.description || '');
-      setListId(task.listId);
-      setPriority(task.priority);
-      setDueDate(task.dueDate || undefined);
-      setStartDate(task.startDate || undefined);
-      setSelectedLabelIds(task.labelIds);
-      setIsCompleted(task.isCompleted);
+      Promise.resolve().then(() => {
+        setTitle(task.title);
+        setDescription(task.description || '');
+        setListId(task.listId);
+        setPriority(task.priority);
+        setDueDate(task.dueDate || undefined);
+        setStartDate(task.startDate || undefined);
+        setSelectedLabelIds(task.labelIds);
+        setIsCompleted(task.isCompleted);
+      });
     }
   }, [task]);
 
   // Expand all checklists by default
   useEffect(() => {
     if (checklists.length > 0) {
-      setExpandedChecklists(new Set(checklists.map(c => c.id)));
+      Promise.resolve().then(() => {
+        setExpandedChecklists(new Set(checklists.map(c => c.id)));
+      });
     }
   }, [checklists]);
 
@@ -127,12 +157,44 @@ export function TaskDetailModal({
     });
   };
 
+  const handleAssigneeUpdate = (newAssigneeIds: string[]) => {
+    onUpdate({ assigneeIds: newAssigneeIds });
+  };
+
   const handleLabelToggle = (labelId: string) => {
     const newLabelIds = selectedLabelIds.includes(labelId)
       ? selectedLabelIds.filter((id) => id !== labelId)
       : [...selectedLabelIds, labelId];
     setSelectedLabelIds(newLabelIds);
     onUpdate({ labelIds: newLabelIds });
+  };
+
+  const handleTagToggle = (tagId: string) => {
+    const currentTagIds = task?.tagIds || [];
+    const newTagIds = currentTagIds.includes(tagId)
+      ? currentTagIds.filter((id) => id !== tagId)
+      : [...currentTagIds, tagId];
+    onUpdate({ tagIds: newTagIds });
+  };
+
+  const handleCreateTag = async () => {
+    if (newTagName.trim() && projectId) {
+      const tagId = await createTag(projectId, {
+        name: newTagName.trim(),
+        color: newTagColor,
+        order: projectTags.length,
+      });
+      // Refresh tags
+      const updatedTags = await getProjectTags(projectId);
+      setProjectTags(updatedTags);
+      // Add the new tag to the task
+      const currentTagIds = task?.tagIds || [];
+      onUpdate({ tagIds: [...currentTagIds, tagId] });
+      // Reset form
+      setNewTagName('');
+      setNewTagColor(TAG_COLORS[0].value);
+      setIsAddingTag(false);
+    }
   };
 
   const handleAddComment = async () => {
@@ -274,14 +336,15 @@ export function TaskDetailModal({
                 </div>
 
                 {/* Assignee */}
-                <div className="flex items-center gap-3 py-2 text-sm">
-                  <User className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-muted-foreground">担当者を追加</span>
-                </div>
+                <AssigneeSelector
+                  assigneeIds={task.assigneeIds}
+                  projectMemberIds={projectMemberIds}
+                  onUpdate={handleAssigneeUpdate}
+                />
 
                 {/* Labels */}
                 <div className="flex items-center gap-3 py-2 text-sm">
-                  <Tag className="h-5 w-5 text-muted-foreground" />
+                  <TagIcon className="h-5 w-5 text-muted-foreground" />
                   <Popover>
                     <PopoverTrigger asChild>
                       <button className="flex items-center gap-2">
@@ -332,6 +395,119 @@ export function TaskDetailModal({
                             )}
                           </button>
                         ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Tags (Status Tags) */}
+                <div className="flex items-center gap-3 py-2 text-sm">
+                  <Bookmark className="h-5 w-5 text-muted-foreground" />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="flex items-center gap-2">
+                        {(task?.tagIds?.length || 0) > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {task?.tagIds?.map((tagId) => {
+                              const tag = projectTags.find((t) => t.id === tagId);
+                              if (!tag) return null;
+                              return (
+                                <Badge
+                                  key={tag.id}
+                                  className="text-white"
+                                  style={{ backgroundColor: tag.color }}
+                                >
+                                  {tag.name}
+                                </Badge>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">タグ: 指定なし</span>
+                        )}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72" align="start">
+                      <div className="space-y-3">
+                        <p className="text-sm font-medium">タグを選択</p>
+                        <div className="space-y-1">
+                          {projectTags.map((tag) => (
+                            <button
+                              key={tag.id}
+                              onClick={() => handleTagToggle(tag.id)}
+                              className={cn(
+                                'flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors hover:bg-muted',
+                                task?.tagIds?.includes(tag.id) && 'bg-muted'
+                              )}
+                            >
+                              <Badge
+                                className="text-white text-xs"
+                                style={{ backgroundColor: tag.color }}
+                              >
+                                {tag.name}
+                              </Badge>
+                              {task?.tagIds?.includes(tag.id) && (
+                                <Check className="ml-auto h-4 w-4 text-primary" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                        <Separator />
+                        {isAddingTag ? (
+                          <div className="space-y-2">
+                            <Input
+                              value={newTagName}
+                              onChange={(e) => setNewTagName(e.target.value)}
+                              placeholder="タグ名を入力..."
+                              className="h-8"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.nativeEvent.isComposing) return;
+                                if (e.key === 'Enter') handleCreateTag();
+                                if (e.key === 'Escape') {
+                                  setIsAddingTag(false);
+                                  setNewTagName('');
+                                }
+                              }}
+                            />
+                            <div className="flex flex-wrap gap-1">
+                              {TAG_COLORS.map((color) => (
+                                <button
+                                  key={color.value}
+                                  onClick={() => setNewTagColor(color.value)}
+                                  className={cn(
+                                    'h-5 w-5 rounded transition-transform hover:scale-110',
+                                    newTagColor === color.value && 'ring-2 ring-offset-1 ring-primary'
+                                  )}
+                                  style={{ backgroundColor: color.value }}
+                                />
+                              ))}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={handleCreateTag}>
+                                作成
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setIsAddingTag(false);
+                                  setNewTagName('');
+                                }}
+                              >
+                                キャンセル
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setIsAddingTag(true)}
+                            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          >
+                            <Plus className="h-4 w-4" />
+                            新しいタグを作成
+                          </button>
+                        )}
                       </div>
                     </PopoverContent>
                   </Popover>

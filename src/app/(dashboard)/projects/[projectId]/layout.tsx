@@ -46,9 +46,9 @@ export default function ProjectLayout({
   const currentTab = pathname.split('/').pop();
 
   return (
-    <div className="flex h-full flex-col space-y-4">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Project Header */}
-      <div className="flex items-center justify-between">
+      <div className="mb-4 flex flex-shrink-0 items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/projects">
@@ -75,7 +75,7 @@ export default function ProjectLayout({
       </div>
 
       {/* Tabs */}
-      <div className="border-b">
+      <div className="mb-4 flex-shrink-0 border-b">
         <nav className="-mb-px flex space-x-4">
           {tabs.map((tab) => {
             const isActive = currentTab === tab.href;
@@ -99,7 +99,7 @@ export default function ProjectLayout({
       </div>
 
       {/* Content */}
-      <div className="flex-1">{children}</div>
+      <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
     </div>
   );
 }
