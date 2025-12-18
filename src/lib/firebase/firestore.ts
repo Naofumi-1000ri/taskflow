@@ -743,6 +743,41 @@ export function subscribeToTaskAttachments(
 
 // ==================== Users ====================
 
+export async function getAllUsers(): Promise<User[]> {
+  const db = getFirebaseDb();
+  const snapshot = await getDocs(collection(db, 'users'));
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      displayName: data.displayName,
+      email: data.email,
+      photoURL: data.photoURL,
+      createdAt: toDate(data.createdAt),
+      updatedAt: toDate(data.updatedAt),
+    } as User;
+  });
+}
+
+export async function getUserByEmail(email: string): Promise<User | null> {
+  const db = getFirebaseDb();
+  const q = query(collection(db, 'users'), where('email', '==', email));
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) {
+    return null;
+  }
+  const doc = snapshot.docs[0];
+  const data = doc.data();
+  return {
+    id: doc.id,
+    displayName: data.displayName,
+    email: data.email,
+    photoURL: data.photoURL,
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
+  } as User;
+}
+
 export async function getUsersByIds(userIds: string[]): Promise<User[]> {
   if (userIds.length === 0) return [];
 
