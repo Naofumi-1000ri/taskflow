@@ -579,6 +579,10 @@ function ChecklistCard({
                 value={newItemText}
                 onChange={(e) => setNewItemText(e.target.value)}
                 onKeyDown={(e) => {
+                  // IME変換中は無視（日本語入力対応）
+                  if (e.nativeEvent.isComposing) {
+                    return;
+                  }
                   if (e.key === 'Enter') {
                     handleAddItem();
                   } else if (e.key === 'Escape') {

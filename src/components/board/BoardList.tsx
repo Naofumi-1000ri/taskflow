@@ -64,6 +64,10 @@ export function BoardList({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // IME変換中は無視（日本語入力対応）
+    if (e.nativeEvent.isComposing) {
+      return;
+    }
     if (e.key === 'Enter') {
       handleAddTask();
     } else if (e.key === 'Escape') {
@@ -80,6 +84,10 @@ export function BoardList({
   };
 
   const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    // IME変換中は無視（日本語入力対応）
+    if (e.nativeEvent.isComposing) {
+      return;
+    }
     if (e.key === 'Enter') {
       handleNameSave();
     } else if (e.key === 'Escape') {

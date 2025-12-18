@@ -83,6 +83,8 @@ export function ChecklistSection({
             placeholder="チェックリスト名..."
             autoFocus
             onKeyDown={(e) => {
+              // IME変換中は無視（日本語入力対応）
+              if (e.nativeEvent.isComposing) return;
               if (e.key === 'Enter') handleAddChecklist();
               if (e.key === 'Escape') {
                 setNewChecklistTitle('');
@@ -186,6 +188,8 @@ export function ChecklistSection({
                   className="h-8 text-sm"
                   autoFocus
                   onKeyDown={(e) => {
+                    // IME変換中は無視（日本語入力対応）
+                    if (e.nativeEvent.isComposing) return;
                     if (e.key === 'Enter') handleAddItem(checklist.id);
                     if (e.key === 'Escape') {
                       setNewItemText('');

@@ -222,6 +222,8 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
                 className="mb-2"
                 autoFocus
                 onKeyDown={(e) => {
+                  // IME変換中は無視（日本語入力対応）
+                  if (e.nativeEvent.isComposing) return;
                   if (e.key === 'Enter') handleAddList();
                   if (e.key === 'Escape') {
                     setNewListName('');
