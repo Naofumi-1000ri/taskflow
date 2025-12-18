@@ -19,9 +19,24 @@ import {
   sortableKeyboardCoordinates,
   horizontalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Plus } from 'lucide-react';
+import { Plus, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { BoardList } from './BoardList';
 import { TaskCard } from './TaskCard';
 import { useBoard } from '@/hooks/useBoard';
@@ -29,7 +44,6 @@ import { useAuthStore } from '@/stores/authStore';
 import type { Task, List } from '@/types';
 import { LIST_COLORS } from '@/types';
 import { cn } from '@/lib/utils';
-import { Loader2 } from 'lucide-react';
 
 interface BoardViewProps {
   projectId: string;
@@ -59,6 +73,12 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
   const [isAddingList, setIsAddingList] = useState(false);
   const [newListName, setNewListName] = useState('');
   const [newListColor, setNewListColor] = useState<string>(LIST_COLORS[0].value);
+
+  // Delete list dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [listToDelete, setListToDelete] = useState<List | null>(null);
+  const [targetListId, setTargetListId] = useState<string>('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -201,6 +221,39 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
     }
   };
 
+  const handleDeleteListRequest = (list: List) => {
+    const tasksInList = getTasksByListId(list.id);
+    if (tasksInList.length === 0) {
+      // No tasks, delete immediately
+      if (confirm('このリストを削除しますか？')) {
+        removeList(list.id);
+      }
+    } else {
+      // Has tasks, show dialog
+      setListToDelete(list);
+      // Default to first available list (not the one being deleted)
+      const otherLists = lists.filter((l) => l.id !== list.id);
+      if (otherLists.length > 0) {
+        setTargetListId(otherLists[0].id);
+      }
+      setDeleteDialogOpen(true);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!listToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await removeList(listToDelete.id, targetListId);
+      setDeleteDialogOpen(false);
+      setListToDelete(null);
+      setTargetListId('');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -233,11 +286,7 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
                 tags={tags}
                 onAddTask={handleAddTask(list.id)}
                 onEditList={(data) => editList(list.id, data)}
-                onDeleteList={() => {
-                  if (confirm('このリストを削除しますか？')) {
-                    removeList(list.id);
-                  }
-                }}
+                onDeleteList={() => handleDeleteListRequest(list)}
                 onTaskClick={onTaskClick}
               />
             ))}
@@ -334,6 +383,65 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
           </div>
         )}
       </DragOverlay>
+
+      {/* Delete List Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              リスト削除の確認
+            </DialogTitle>
+            <DialogDescription>
+              リスト「{listToDelete?.name}」には
+              {listToDelete && getTasksByListId(listToDelete.id).length}件の
+              タスクがあります。タスクを別のリストに移動してから削除します。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="mb-2 block text-sm font-medium">
+              タスクの移動先
+            </label>
+            <Select value={targetListId} onValueChange={setTargetListId}>
+              <SelectTrigger>
+                <SelectValue placeholder="移動先のリストを選択" />
+              </SelectTrigger>
+              <SelectContent>
+                {lists
+                  .filter((l) => l.id !== listToDelete?.id)
+                  .map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="h-3 w-3 rounded-full"
+                          style={{ backgroundColor: l.color }}
+                        />
+                        {l.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={isDeleting}
+            >
+              キャンセル
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting || !targetListId}
+            >
+              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              タスクを移動して削除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DndContext>
   );
 }

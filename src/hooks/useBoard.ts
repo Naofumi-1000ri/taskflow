@@ -107,13 +107,34 @@ export function useBoard(projectId: string | null) {
     [projectId]
   );
 
-  // Delete list
+  // Delete list (move tasks to target list first)
   const removeList = useCallback(
-    async (listId: string) => {
+    async (listId: string, targetListId?: string) => {
       if (!projectId) return;
+
+      // Get tasks in the list to be deleted
+      const tasksToMove = state.tasks.filter((t) => t.listId === listId);
+
+      if (tasksToMove.length > 0 && targetListId) {
+        // Get max order in target list
+        const targetTasks = state.tasks.filter((t) => t.listId === targetListId);
+        let maxOrder = Math.max(...targetTasks.map((t) => t.order), -1);
+
+        // Move all tasks to target list
+        const moveUpdates = tasksToMove.map((task) => {
+          maxOrder += 1;
+          return updateTask(projectId, task.id, {
+            listId: targetListId,
+            order: maxOrder,
+          });
+        });
+        await Promise.all(moveUpdates);
+      }
+
+      // Delete the list
       await deleteList(projectId, listId);
     },
-    [projectId]
+    [projectId, state.tasks]
   );
 
   // Reorder lists
