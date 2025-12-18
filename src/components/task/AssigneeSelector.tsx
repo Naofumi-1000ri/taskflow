@@ -9,26 +9,30 @@ import {
 } from '@/components/ui/popover';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { getUsersByIds, getAllUsers } from '@/lib/firebase/firestore';
+import { getUsersByIds } from '@/lib/firebase/firestore';
 import type { User as UserType } from '@/types';
 
 interface AssigneeSelectorProps {
   assigneeIds: string[];
+  projectMemberIds: string[];
   onUpdate: (assigneeIds: string[]) => void;
 }
 
 export function AssigneeSelector({
   assigneeIds,
+  projectMemberIds,
   onUpdate,
 }: AssigneeSelectorProps) {
-  const [allUsers, setAllUsers] = useState<UserType[]>([]);
+  const [members, setMembers] = useState<UserType[]>([]);
   const [assignees, setAssignees] = useState<UserType[]>([]);
   const [isOpen, setIsOpen] = useState(false);
 
-  // Fetch all users (shared workspace)
+  // Fetch project members
   useEffect(() => {
-    getAllUsers().then(setAllUsers);
-  }, []);
+    if (projectMemberIds.length > 0) {
+      getUsersByIds(projectMemberIds).then(setMembers);
+    }
+  }, [projectMemberIds]);
 
   // Fetch current assignees
   useEffect(() => {
@@ -107,34 +111,34 @@ export function AssigneeSelector({
         <PopoverContent className="w-64 p-2" align="start">
           <p className="mb-2 px-2 text-sm font-medium">担当者を選択</p>
           <div className="max-h-64 space-y-1 overflow-y-auto">
-            {allUsers.length > 0 ? (
-              allUsers.map((user) => (
+            {members.length > 0 ? (
+              members.map((member) => (
                 <button
-                  key={user.id}
-                  onClick={() => handleToggleAssignee(user.id)}
+                  key={member.id}
+                  onClick={() => handleToggleAssignee(member.id)}
                   className={cn(
                     'flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors hover:bg-muted',
-                    assigneeIds.includes(user.id) && 'bg-muted'
+                    assigneeIds.includes(member.id) && 'bg-muted'
                   )}
                 >
                   <Avatar className="h-7 w-7">
-                    <AvatarImage src={user.photoURL || ''} alt={user.displayName} />
+                    <AvatarImage src={member.photoURL || ''} alt={member.displayName} />
                     <AvatarFallback className="text-xs">
-                      {getInitials(user.displayName)}
+                      {getInitials(member.displayName)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 text-left">
-                    <p className="font-medium">{user.displayName}</p>
-                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                    <p className="font-medium">{member.displayName}</p>
+                    <p className="text-xs text-muted-foreground">{member.email}</p>
                   </div>
-                  {assigneeIds.includes(user.id) && (
+                  {assigneeIds.includes(member.id) && (
                     <Check className="h-4 w-4 text-primary" />
                   )}
                 </button>
               ))
             ) : (
               <p className="px-2 py-4 text-center text-sm text-muted-foreground">
-                ユーザーがいません
+                プロジェクトメンバーがいません
               </p>
             )}
           </div>

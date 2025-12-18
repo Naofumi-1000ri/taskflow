@@ -47,7 +47,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useTaskDetails } from '@/hooks/useTaskDetails';
 import { useAuthStore } from '@/stores/authStore';
-import { getProjectTags, createTag } from '@/lib/firebase/firestore';
+import { getProject, getProjectTags, createTag } from '@/lib/firebase/firestore';
 import { AssigneeSelector } from './AssigneeSelector';
 import type { Task, Label as LabelType, Tag as TagType, List, Priority, Checklist } from '@/types';
 import { TAG_COLORS } from '@/types';
@@ -95,10 +95,22 @@ export function TaskDetailModal({
   const [isCompleted, setIsCompleted] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [expandedChecklists, setExpandedChecklists] = useState<Set<string>>(new Set());
+  const [projectMemberIds, setProjectMemberIds] = useState<string[]>([]);
   const [projectTags, setProjectTags] = useState<TagType[]>([]);
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState<string>(TAG_COLORS[0].value);
+
+  // Fetch project members
+  useEffect(() => {
+    if (projectId) {
+      getProject(projectId).then((project) => {
+        if (project) {
+          setProjectMemberIds(project.memberIds);
+        }
+      });
+    }
+  }, [projectId]);
 
   // Fetch project tags
   useEffect(() => {
@@ -326,6 +338,7 @@ export function TaskDetailModal({
                 {/* Assignee */}
                 <AssigneeSelector
                   assigneeIds={task.assigneeIds}
+                  projectMemberIds={projectMemberIds}
                   onUpdate={handleAssigneeUpdate}
                 />
 
