@@ -1,6 +1,7 @@
 'use client';
 
-import { Bell, Menu, Search } from 'lucide-react';
+import Link from 'next/link';
+import { Bell, Menu, Search, User, Settings, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -90,10 +91,21 @@ export function Header() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>プロフィール</DropdownMenuItem>
-            <DropdownMenuItem>設定</DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/profile" className="flex items-center">
+                <User className="mr-2 h-4 w-4" />
+                プロフィール
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/settings" className="flex items-center">
+                <Settings className="mr-2 h-4 w-4" />
+                設定
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={signOut}>
+            <DropdownMenuItem onClick={signOut} className="text-red-600">
+              <LogOut className="mr-2 h-4 w-4" />
               ログアウト
             </DropdownMenuItem>
           </DropdownMenuContent>

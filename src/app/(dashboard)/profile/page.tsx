@@ -1,0 +1,285 @@
+'use client';
+
+import { useState, useRef } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/stores/authStore';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
+import { Camera, Save, X, Loader2 } from 'lucide-react';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirebaseDb } from '@/lib/firebase/config';
+import { getFirebaseStorage } from '@/lib/firebase/config';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+export default function ProfilePage() {
+  const { user } = useAuthStore();
+  const { firebaseUser } = useAuth();
+
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [displayName, setDisplayName] = useState(user?.displayName || '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const handleSaveName = async () => {
+    if (!user || !displayName.trim()) return;
+
+    setIsSaving(true);
+    try {
+      const db = getFirebaseDb();
+      const userRef = doc(db, 'users', user.id);
+      await updateDoc(userRef, {
+        displayName: displayName.trim(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // Update local state
+      useAuthStore.getState().setUser({
+        ...user,
+        displayName: displayName.trim(),
+      });
+
+      setIsEditingName(false);
+    } catch (error) {
+      console.error('Failed to update display name:', error);
+      alert('表示名の更新に失敗しました');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setDisplayName(user?.displayName || '');
+    setIsEditingName(false);
+  };
+
+  const handlePhotoClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('画像ファイルを選択してください');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('ファイルサイズは5MB以下にしてください');
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    try {
+      const storage = getFirebaseStorage();
+      const photoRef = ref(storage, `users/${user.id}/profile.${file.name.split('.').pop()}`);
+
+      await uploadBytes(photoRef, file);
+      const photoURL = await getDownloadURL(photoRef);
+
+      // Update Firestore
+      const db = getFirebaseDb();
+      const userRef = doc(db, 'users', user.id);
+      await updateDoc(userRef, {
+        photoURL,
+        updatedAt: serverTimestamp(),
+      });
+
+      // Update local state
+      useAuthStore.getState().setUser({
+        ...user,
+        photoURL,
+      });
+    } catch (error) {
+      console.error('Failed to upload photo:', error);
+      alert('写真のアップロードに失敗しました');
+    } finally {
+      setIsUploadingPhoto(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">マイアカウント</h1>
+        <p className="text-muted-foreground">プロフィール情報を管理します</p>
+      </div>
+
+      {/* Profile Photo */}
+      <Card>
+        <CardHeader>
+          <CardTitle>プロフィール画像</CardTitle>
+          <CardDescription>
+            プロジェクトボードやコメントに表示されるアイコンです
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-6">
+            <div className="relative">
+              <Avatar className="h-24 w-24">
+                <AvatarImage src={user.photoURL || ''} alt={user.displayName} />
+                <AvatarFallback className="text-2xl">
+                  {getInitials(user.displayName)}
+                </AvatarFallback>
+              </Avatar>
+              {isUploadingPhoto && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
+                  <Loader2 className="h-6 w-6 animate-spin text-white" />
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                onClick={handlePhotoClick}
+                disabled={isUploadingPhoto}
+              >
+                <Camera className="mr-2 h-4 w-4" />
+                画像を変更
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoChange}
+                className="hidden"
+              />
+              <p className="text-xs text-muted-foreground">
+                JPG, PNG, GIF (最大5MB)
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Display Name */}
+      <Card>
+        <CardHeader>
+          <CardTitle>表示名</CardTitle>
+          <CardDescription>
+            ボード上やメンション時に表示される名前です
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isEditingName ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="displayName">表示名</Label>
+                <Input
+                  id="displayName"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.nativeEvent.isComposing) return;
+                    if (e.key === 'Enter') handleSaveName();
+                    if (e.key === 'Escape') handleCancelEdit();
+                  }}
+                  placeholder="表示名を入力"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSaveName} disabled={isSaving || !displayName.trim()}>
+                  {isSaving ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  保存
+                </Button>
+                <Button variant="outline" onClick={handleCancelEdit} disabled={isSaving}>
+                  <X className="mr-2 h-4 w-4" />
+                  キャンセル
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <span className="text-lg">{user.displayName}</span>
+              <Button variant="outline" onClick={() => setIsEditingName(true)}>
+                変更
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Email */}
+      <Card>
+        <CardHeader>
+          <CardTitle>メールアドレス</CardTitle>
+          <CardDescription>
+            ログインや通知の受信に使用されます
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <span className="text-lg">{user.email}</span>
+            <span className="text-sm text-muted-foreground">
+              {firebaseUser?.providerData[0]?.providerId === 'google.com' && (
+                'Googleアカウントで管理'
+              )}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Account Info */}
+      <Card>
+        <CardHeader>
+          <CardTitle>アカウント情報</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">アカウント作成日</span>
+            <span>
+              {user.createdAt?.toLocaleDateString('ja-JP', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              })}
+            </span>
+          </div>
+          <Separator />
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">認証方法</span>
+            <span>
+              {firebaseUser?.providerData[0]?.providerId === 'google.com'
+                ? 'Google認証'
+                : 'メール/パスワード'}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
