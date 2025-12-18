@@ -139,11 +139,10 @@ export async function archiveProject(
   await updateProject(projectId, { isArchived });
 }
 
-export async function getUserProjects(userId: string): Promise<Project[]> {
+export async function getAllProjects(): Promise<Project[]> {
   const db = getFirebaseDb();
   const q = query(
     collection(db, 'projects'),
-    where('memberIds', 'array-contains', userId),
     where('isArchived', '==', false),
     orderBy('updatedAt', 'desc')
   );
@@ -152,15 +151,13 @@ export async function getUserProjects(userId: string): Promise<Project[]> {
   return snapshot.docs.map((doc) => convertDoc<Project>(doc.data(), doc.id));
 }
 
-export function subscribeToUserProjects(
-  userId: string,
+export function subscribeToAllProjects(
   callback: (projects: Project[]) => void,
   onError?: (error: Error) => void
 ): () => void {
   const db = getFirebaseDb();
   const q = query(
     collection(db, 'projects'),
-    where('memberIds', 'array-contains', userId),
     where('isArchived', '==', false),
     orderBy('updatedAt', 'desc')
   );
@@ -174,7 +171,7 @@ export function subscribeToUserProjects(
       callback(projects);
     },
     (error) => {
-      console.error('[Firestore] subscribeToUserProjects error:', error);
+      console.error('[Firestore] subscribeToAllProjects error:', error);
       if (onError) {
         onError(error);
       }
@@ -742,6 +739,42 @@ export function subscribeToTaskAttachments(
 }
 
 // ==================== Users ====================
+
+export async function getAllUsers(): Promise<User[]> {
+  const db = getFirebaseDb();
+  const snapshot = await getDocs(collection(db, 'users'));
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      displayName: data.displayName,
+      email: data.email,
+      photoURL: data.photoURL,
+      createdAt: toDate(data.createdAt),
+      updatedAt: toDate(data.updatedAt),
+    } as User;
+  });
+}
+
+export function subscribeToAllUsers(
+  callback: (users: User[]) => void
+): () => void {
+  const db = getFirebaseDb();
+  return onSnapshot(collection(db, 'users'), (snapshot) => {
+    const users = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        displayName: data.displayName,
+        email: data.email,
+        photoURL: data.photoURL,
+        createdAt: toDate(data.createdAt),
+        updatedAt: toDate(data.updatedAt),
+      } as User;
+    });
+    callback(users);
+  });
+}
 
 export async function getUsersByIds(userIds: string[]): Promise<User[]> {
   if (userIds.length === 0) return [];

@@ -8,7 +8,7 @@ import {
   updateProject,
   deleteProject,
   archiveProject,
-  subscribeToUserProjects,
+  subscribeToAllProjects,
   getProjectMembers,
   addProjectMember,
   removeProjectMember,
@@ -22,7 +22,7 @@ export function useProjects() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  // Subscribe to user's projects
+  // Subscribe to all projects (shared workspace)
   useEffect(() => {
     if (!firebaseUser) {
       Promise.resolve().then(() => {
@@ -36,8 +36,7 @@ export function useProjects() {
       setIsLoading(true);
       setError(null);
     });
-    const unsubscribe = subscribeToUserProjects(
-      firebaseUser.uid,
+    const unsubscribe = subscribeToAllProjects(
       (projects) => {
         setProjects(projects);
         setIsLoading(false);
