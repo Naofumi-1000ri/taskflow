@@ -149,7 +149,11 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
       // Handle list reordering
       if (activeData?.type === 'list') {
         const activeIndex = lists.findIndex((l) => l.id === activeId);
-        const overIndex = lists.findIndex((l) => l.id === overId);
+        // overId might be "list-xxx" (droppable) or just "xxx" (sortable)
+        const overListId = overId.startsWith('list-') ? overId.replace('list-', '') : overId;
+        const overIndex = lists.findIndex((l) => l.id === overListId);
+
+        console.log('[DragEnd] List reorder:', { activeId, overId, overListId, activeIndex, overIndex });
 
         if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
           const reordered = arrayMove(lists, activeIndex, overIndex);
