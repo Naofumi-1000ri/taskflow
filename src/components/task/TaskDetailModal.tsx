@@ -574,7 +574,7 @@ function ChecklistCard({
           {/* Add Item */}
           {isAddingItem ? (
             <div className="flex items-center gap-2 py-2">
-              <Checkbox disabled />
+              <div className="h-4 w-4 rounded border border-muted-foreground/50" />
               <Input
                 value={newItemText}
                 onChange={(e) => setNewItemText(e.target.value)}
@@ -605,13 +605,20 @@ function ChecklistCard({
               </Button>
             </div>
           ) : (
-            <button
+            <div
+              role="button"
+              tabIndex={0}
               onClick={() => setIsAddingItem(true)}
-              className="flex items-center gap-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  setIsAddingItem(true);
+                }
+              }}
+              className="flex cursor-pointer items-center gap-3 py-2 text-sm text-muted-foreground hover:text-foreground"
             >
-              <Checkbox disabled />
+              <div className="h-4 w-4 rounded border border-muted-foreground/50" />
               <span>アイテムを追加</span>
-            </button>
+            </div>
           )}
         </div>
       )}
