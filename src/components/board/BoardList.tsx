@@ -69,8 +69,7 @@ export function BoardList({
   });
 
   const style = {
-    // Don't apply transform when dragging since DragOverlay handles it
-    transform: isDragging ? undefined : CSS.Transform.toString(transform),
+    transform: CSS.Transform.toString(transform),
     transition,
   };
 
@@ -128,7 +127,7 @@ export function BoardList({
       className={cn(
         'flex h-full max-h-full min-h-0 w-72 flex-shrink-0 flex-col rounded-lg bg-gray-100 transition-colors',
         isOver && 'bg-gray-200',
-        isDragging && 'opacity-50'
+        isDragging && 'opacity-0'
       )}
       data-testid="board-list"
     >

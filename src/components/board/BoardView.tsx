@@ -316,13 +316,16 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
           />
         )}
         {activeList && (
-          <div className="w-72 rounded-lg bg-gray-100 p-3 opacity-80 shadow-lg">
+          <div className="w-72 rounded-lg bg-gray-100 p-3 shadow-xl ring-2 ring-primary/20">
             <div className="flex items-center gap-2">
               <div
                 className="h-3 w-3 rounded-full"
                 style={{ backgroundColor: activeList.color }}
               />
               <span className="font-semibold">{activeList.name}</span>
+              <span className="text-sm text-muted-foreground">
+                {getTasksByListId(activeList.id).length}
+              </span>
             </div>
           </div>
         )}
