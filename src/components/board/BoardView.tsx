@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
+  rectIntersection,
+  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -12,6 +13,7 @@ import {
   type DragStartEvent,
   type DragEndEvent,
   type DragOverEvent,
+  type CollisionDetection,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -74,11 +76,52 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
   const [newListName, setNewListName] = useState('');
   const [newListColor, setNewListColor] = useState<string>(LIST_COLORS[0].value);
 
+  // Local list order for optimistic updates
+  const [localLists, setLocalLists] = useState<List[]>([]);
+  const isDraggingList = useRef(false);
+
+  // Sync local lists with Firestore lists (but not during drag)
+  useEffect(() => {
+    if (!isDraggingList.current) {
+      setLocalLists(lists);
+    }
+  }, [lists]);
+
+  // Use local lists for rendering (optimistic updates)
+  const displayLists = localLists.length > 0 ? localLists : lists;
+
   // Delete list dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [listToDelete, setListToDelete] = useState<List | null>(null);
   const [targetListId, setTargetListId] = useState<string>('');
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Custom collision detection: use pointerWithin for lists, rectIntersection for tasks
+  const customCollisionDetection: CollisionDetection = useCallback((args) => {
+    const { active } = args;
+    const activeData = active.data.current;
+
+    // For list dragging, use pointerWithin (more precise)
+    if (activeData?.type === 'list') {
+      // Only consider other lists (exclude droppable areas like "list-xxx")
+      const listCollisions = pointerWithin({
+        ...args,
+        droppableContainers: args.droppableContainers.filter(
+          (container) => {
+            const id = String(container.id);
+            // Only match list IDs, not droppable "list-xxx" IDs
+            return !id.startsWith('list-') && displayLists.some((l) => l.id === id);
+          }
+        ),
+      });
+      if (listCollisions.length > 0) {
+        return listCollisions;
+      }
+    }
+
+    // For tasks or fallback, use rectIntersection
+    return rectIntersection(args);
+  }, [displayLists]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -97,6 +140,7 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
       const activeData = active.data.current;
 
       if (activeData?.type === 'list') {
+        isDraggingList.current = true;
         setActiveList(activeData.list);
         setActiveTask(null);
       } else {
@@ -157,6 +201,13 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
       setActiveTask(null);
       setActiveList(null);
 
+      const activeData = active.data.current;
+
+      // Clear dragging flag for lists
+      if (activeData?.type === 'list') {
+        isDraggingList.current = false;
+      }
+
       if (!over) return;
 
       const activeId = active.id as string;
@@ -164,46 +215,44 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
 
       if (activeId === overId) return;
 
-      const activeData = active.data.current;
-
       // Handle list reordering
       if (activeData?.type === 'list') {
-        const activeIndex = lists.findIndex((l) => l.id === activeId);
-        // overId might be "list-xxx" (droppable) or just "xxx" (sortable)
-        const overListId = overId.startsWith('list-') ? overId.replace('list-', '') : overId;
-        const overIndex = lists.findIndex((l) => l.id === overListId);
-
-        console.log('[DragEnd] List reorder:', { activeId, overId, overListId, activeIndex, overIndex });
+        const activeIndex = displayLists.findIndex((l) => l.id === activeId);
+        const overIndex = displayLists.findIndex((l) => l.id === overId);
 
         if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
-          const reordered = arrayMove(lists, activeIndex, overIndex);
+          // Optimistic update: immediately update local state
+          const reordered = arrayMove(displayLists, activeIndex, overIndex);
+          setLocalLists(reordered);
+
+          // Then persist to Firestore
           reorderLists(reordered);
         }
         return;
       }
 
       // Handle task reordering
-      const activeTask = tasks.find((t) => t.id === activeId);
+      const activeTaskItem = tasks.find((t) => t.id === activeId);
       const overTask = tasks.find((t) => t.id === overId);
 
-      if (!activeTask) return;
+      if (!activeTaskItem) return;
 
       // If both tasks are in the same list, reorder
-      if (overTask && activeTask.listId === overTask.listId) {
-        const listTasks = getTasksByListId(activeTask.listId);
+      if (overTask && activeTaskItem.listId === overTask.listId) {
+        const listTasks = getTasksByListId(activeTaskItem.listId);
         const activeIndex = listTasks.findIndex((t) => t.id === activeId);
         const overIndex = listTasks.findIndex((t) => t.id === overId);
 
         if (activeIndex !== overIndex) {
           const reordered = arrayMove(listTasks, activeIndex, overIndex);
           reorderTasks(
-            activeTask.listId,
+            activeTaskItem.listId,
             reordered.map((t) => t.id)
           );
         }
       }
     },
-    [tasks, lists, getTasksByListId, reorderTasks, reorderLists]
+    [tasks, displayLists, getTasksByListId, reorderTasks, reorderLists]
   );
 
   const handleAddList = () => {
@@ -232,7 +281,7 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
       // Has tasks, show dialog
       setListToDelete(list);
       // Default to first available list (not the one being deleted)
-      const otherLists = lists.filter((l) => l.id !== list.id);
+      const otherLists = displayLists.filter((l) => l.id !== list.id);
       if (otherLists.length > 0) {
         setTargetListId(otherLists[0].id);
       }
@@ -265,7 +314,7 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={customCollisionDetection}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
@@ -273,10 +322,10 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
       <div className="h-full min-h-0 overflow-x-auto pb-4" data-testid="board-view">
         <div className="flex h-full min-w-max gap-4">
           <SortableContext
-            items={lists.map((l) => l.id)}
+            items={displayLists.map((l) => l.id)}
             strategy={horizontalListSortingStrategy}
           >
-            {lists.map((list) => (
+            {displayLists.map((list) => (
               <BoardList
                 key={list.id}
                 projectId={projectId}
@@ -407,7 +456,7 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
                 <SelectValue placeholder="移動先のリストを選択" />
               </SelectTrigger>
               <SelectContent>
-                {lists
+                {displayLists
                   .filter((l) => l.id !== listToDelete?.id)
                   .map((l) => (
                     <SelectItem key={l.id} value={l.id}>
