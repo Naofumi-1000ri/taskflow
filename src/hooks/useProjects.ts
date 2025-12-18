@@ -8,7 +8,6 @@ import {
   updateProject,
   deleteProject,
   archiveProject,
-  getUserProjects,
   subscribeToUserProjects,
   getProjectMembers,
   addProjectMember,
@@ -26,13 +25,17 @@ export function useProjects() {
   // Subscribe to user's projects
   useEffect(() => {
     if (!firebaseUser) {
-      setProjects([]);
-      setIsLoading(false);
+      Promise.resolve().then(() => {
+        setProjects([]);
+        setIsLoading(false);
+      });
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
+    Promise.resolve().then(() => {
+      setIsLoading(true);
+      setError(null);
+    });
     const unsubscribe = subscribeToUserProjects(
       firebaseUser.uid,
       (projects) => {
@@ -133,9 +136,11 @@ export function useProject(projectId: string | null) {
   // Fetch project
   useEffect(() => {
     if (!projectId) {
-      setProject(null);
-      setMembers([]);
-      setIsLoading(false);
+      Promise.resolve().then(() => {
+        setProject(null);
+        setMembers([]);
+        setIsLoading(false);
+      });
       return;
     }
 

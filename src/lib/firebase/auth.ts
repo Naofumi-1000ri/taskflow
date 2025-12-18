@@ -13,6 +13,14 @@ import type { User as AppUser } from '@/types';
 
 const googleProvider = new GoogleAuthProvider();
 
+// Restrict to 1000ri.jp domain
+googleProvider.setCustomParameters({
+  hd: '1000ri.jp',
+});
+
+// Allowed email domain
+const ALLOWED_DOMAIN = '1000ri.jp';
+
 // Test user credentials (only for E2E testing)
 export const TEST_USER = {
   email: 'test@example.com',
@@ -20,17 +28,30 @@ export const TEST_USER = {
   displayName: 'テストユーザー',
 } as const;
 
-// Check if test mode is enabled
+// Check if test mode is enabled (only on localhost)
 export function isTestMode(): boolean {
-  return process.env.NEXT_PUBLIC_ENABLE_TEST_AUTH === 'true';
+  if (typeof window === 'undefined') return false;
+  const isLocalhost =
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1';
+  return isLocalhost && process.env.NEXT_PUBLIC_ENABLE_TEST_AUTH === 'true';
 }
 
 /**
  * Sign in with Google OAuth (popup method)
+ * Only allows users with 1000ri.jp domain email
  */
 export async function signInWithGoogle(): Promise<User> {
   const auth = getFirebaseAuth();
   const result = await signInWithPopup(auth, googleProvider);
+
+  // Verify email domain
+  const email = result.user.email;
+  if (!email || !email.endsWith(`@${ALLOWED_DOMAIN}`)) {
+    // Sign out the unauthorized user
+    await firebaseSignOut(auth);
+    throw new Error(`このアプリは ${ALLOWED_DOMAIN} ドメインのユーザーのみ利用可能です。`);
+  }
 
   // Create or update user document in Firestore
   await createOrUpdateUser(result.user);
@@ -39,11 +60,11 @@ export async function signInWithGoogle(): Promise<User> {
 }
 
 /**
- * Sign in with test user (E2E testing only)
+ * Sign in with test user (E2E testing only, localhost only)
  */
 export async function signInWithTestUser(): Promise<User> {
   if (!isTestMode()) {
-    throw new Error('Test authentication is not enabled');
+    throw new Error('Test authentication is only available on localhost');
   }
 
   const auth = getFirebaseAuth();
