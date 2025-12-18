@@ -69,7 +69,8 @@ export function BoardList({
   });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    // Don't apply transform when dragging since DragOverlay handles it
+    transform: isDragging ? undefined : CSS.Transform.toString(transform),
     transition,
   };
 
