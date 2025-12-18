@@ -233,7 +233,7 @@ export default function ProjectSettingsPage() {
                 const isOwner = member.role === 'admin';
                 return (
                   <div
-                    key={member.userId}
+                    key={member.id}
                     className="flex items-center justify-between rounded-lg border p-3"
                   >
                     <div className="flex items-center gap-3">
@@ -269,7 +269,7 @@ export default function ProjectSettingsPage() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
-                            onClick={() => handleRemoveMember(member.userId, member.userId)}
+                            onClick={() => handleRemoveMember(member.id, member.userId)}
                           >
                             <X className="h-4 w-4" />
                           </Button>

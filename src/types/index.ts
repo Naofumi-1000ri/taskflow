@@ -23,6 +23,7 @@ export interface Project {
 }
 
 export interface ProjectMember {
+  id: string; // Firestore document ID
   userId: string;
   role: 'admin' | 'editor' | 'viewer';
   joinedAt: Date;

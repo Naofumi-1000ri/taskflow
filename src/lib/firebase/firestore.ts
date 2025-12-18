@@ -248,6 +248,7 @@ export async function getProjectMembers(
   );
 
   return snapshot.docs.map((doc) => ({
+    id: doc.id,
     userId: doc.data().userId,
     role: doc.data().role,
     joinedAt: toDate(doc.data().joinedAt),
