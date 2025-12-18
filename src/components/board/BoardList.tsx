@@ -4,9 +4,11 @@ import { useState } from 'react';
 import {
   SortableContext,
   verticalListSortingStrategy,
+  useSortable,
 } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useDroppable } from '@dnd-kit/core';
-import { MoreHorizontal, Plus, Trash2, Palette } from 'lucide-react';
+import { MoreHorizontal, Plus, Trash2, Palette, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -15,12 +17,11 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { TaskCard } from './TaskCard';
 import { cn } from '@/lib/utils';
 import type { List, Task, Label, Tag } from '@/types';
@@ -54,7 +55,26 @@ export function BoardList({
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState(list.name);
 
-  const { setNodeRef, isOver } = useDroppable({
+  // Sortable for list reordering
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setSortableNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: list.id,
+    data: { type: 'list', list },
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  // Droppable for receiving tasks
+  const { setNodeRef: setDroppableNodeRef, isOver } = useDroppable({
     id: `list-${list.id}`,
     data: { type: 'list', listId: list.id },
   });
@@ -102,15 +122,25 @@ export function BoardList({
 
   return (
     <div
+      ref={setSortableNodeRef}
+      style={style}
       className={cn(
         'flex h-full max-h-full min-h-0 w-72 flex-shrink-0 flex-col rounded-lg bg-gray-100 transition-colors',
-        isOver && 'bg-gray-200'
+        isOver && 'bg-gray-200',
+        isDragging && 'opacity-50'
       )}
       data-testid="board-list"
     >
       {/* List Header */}
       <div className="flex flex-shrink-0 items-center justify-between p-3 pb-2">
         <div className="flex items-center gap-2">
+          <button
+            className="cursor-grab touch-none text-gray-400 hover:text-gray-600"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
           <div
             className="h-3 w-3 rounded-full"
             style={{ backgroundColor: list.color }}
@@ -142,29 +172,29 @@ export function BoardList({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <Popover>
-              <PopoverTrigger asChild>
-                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                  <Palette className="mr-2 h-4 w-4" />
-                  カラー変更
-                </DropdownMenuItem>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-2" side="right">
-                <div className="flex flex-wrap gap-2">
-                  {LIST_COLORS.map((color) => (
-                    <button
-                      key={color.value}
-                      onClick={() => onEditList({ color: color.value })}
-                      className={cn(
-                        'h-6 w-6 rounded-full transition-transform hover:scale-110',
-                        list.color === color.value && 'ring-2 ring-offset-1 ring-primary'
-                      )}
-                      style={{ backgroundColor: color.value }}
-                    />
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Palette className="mr-2 h-4 w-4" />
+                カラー変更
+              </DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent className="p-2">
+                  <div className="flex flex-wrap gap-2">
+                    {LIST_COLORS.map((color) => (
+                      <button
+                        key={color.value}
+                        onClick={() => onEditList({ color: color.value })}
+                        className={cn(
+                          'h-6 w-6 rounded-full transition-transform hover:scale-110',
+                          list.color === color.value && 'ring-2 ring-offset-1 ring-primary'
+                        )}
+                        style={{ backgroundColor: color.value }}
+                      />
+                    ))}
+                  </div>
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={onDeleteList}
@@ -218,7 +248,7 @@ export function BoardList({
 
       {/* Tasks */}
       <div
-        ref={setNodeRef}
+        ref={setDroppableNodeRef}
         className="board-list-scroll min-h-0 flex-1 space-y-2 px-3 pb-3"
       >
         <SortableContext

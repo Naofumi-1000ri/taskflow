@@ -26,7 +26,7 @@ import { BoardList } from './BoardList';
 import { TaskCard } from './TaskCard';
 import { useBoard } from '@/hooks/useBoard';
 import { useAuthStore } from '@/stores/authStore';
-import type { Task } from '@/types';
+import type { Task, List } from '@/types';
 import { LIST_COLORS } from '@/types';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
@@ -48,12 +48,14 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
     addList,
     editList,
     removeList,
+    reorderLists,
     addTask,
     moveTask,
     reorderTasks,
   } = useBoard(projectId);
 
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [activeList, setActiveList] = useState<List | null>(null);
   const [isAddingList, setIsAddingList] = useState(false);
   const [newListName, setNewListName] = useState('');
   const [newListColor, setNewListColor] = useState<string>(LIST_COLORS[0].value);
@@ -72,9 +74,17 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
       const { active } = event;
-      const task = tasks.find((t) => t.id === active.id);
-      if (task) {
-        setActiveTask(task);
+      const activeData = active.data.current;
+
+      if (activeData?.type === 'list') {
+        setActiveList(activeData.list);
+        setActiveTask(null);
+      } else {
+        const task = tasks.find((t) => t.id === active.id);
+        if (task) {
+          setActiveTask(task);
+          setActiveList(null);
+        }
       }
     },
     [tasks]
@@ -84,6 +94,10 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
     (event: DragOverEvent) => {
       const { active, over } = event;
       if (!over) return;
+
+      // Skip if dragging a list
+      const activeData = active.data.current;
+      if (activeData?.type === 'list') return;
 
       const activeId = active.id as string;
       const overId = over.id as string;
@@ -121,6 +135,7 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
     (event: DragEndEvent) => {
       const { active, over } = event;
       setActiveTask(null);
+      setActiveList(null);
 
       if (!over) return;
 
@@ -129,6 +144,21 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
 
       if (activeId === overId) return;
 
+      const activeData = active.data.current;
+
+      // Handle list reordering
+      if (activeData?.type === 'list') {
+        const activeIndex = lists.findIndex((l) => l.id === activeId);
+        const overIndex = lists.findIndex((l) => l.id === overId);
+
+        if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
+          const reordered = arrayMove(lists, activeIndex, overIndex);
+          reorderLists(reordered);
+        }
+        return;
+      }
+
+      // Handle task reordering
       const activeTask = tasks.find((t) => t.id === activeId);
       const overTask = tasks.find((t) => t.id === overId);
 
@@ -149,7 +179,7 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
         }
       }
     },
-    [tasks, getTasksByListId, reorderTasks]
+    [tasks, lists, getTasksByListId, reorderTasks, reorderLists]
   );
 
   const handleAddList = () => {
@@ -284,6 +314,17 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
             onClick={() => {}}
             isDragging
           />
+        )}
+        {activeList && (
+          <div className="w-72 rounded-lg bg-gray-100 p-3 opacity-80 shadow-lg">
+            <div className="flex items-center gap-2">
+              <div
+                className="h-3 w-3 rounded-full"
+                style={{ backgroundColor: activeList.color }}
+              />
+              <span className="font-semibold">{activeList.name}</span>
+            </div>
+          </div>
         )}
       </DragOverlay>
     </DndContext>
