@@ -306,8 +306,14 @@ export function TaskDetailModal({
                         )}
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent className="max-h-[70vh] w-auto overflow-y-auto p-4" align="start">
-                      <div className="space-y-4">
+                    <PopoverContent
+                      className="w-auto p-4"
+                      align="start"
+                      side="right"
+                      collisionPadding={20}
+                      sideOffset={8}
+                    >
+                      <div className="max-h-[70vh] space-y-4 overflow-y-auto">
                         <div>
                           <p className="mb-2 text-sm font-medium">開始日</p>
                           <Calendar
