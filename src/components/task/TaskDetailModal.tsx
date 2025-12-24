@@ -289,55 +289,54 @@ export function TaskDetailModal({
 
               {/* Metadata Row */}
               <div className="space-y-3">
-                {/* Date */}
+                {/* Start Date */}
                 <div className="flex items-center gap-3 py-2 text-sm">
                   <CalendarIcon className="h-5 w-5 text-muted-foreground" />
                   <Popover>
                     <PopoverTrigger asChild>
                       <button className="text-muted-foreground hover:text-foreground">
-                        {startDate || dueDate ? (
-                          <span>
-                            {startDate && format(startDate, 'M/d', { locale: ja })}
-                            {startDate && dueDate && ' - '}
-                            {dueDate && format(dueDate, 'M/d', { locale: ja })}
-                          </span>
+                        {startDate ? (
+                          <span>開始: {format(startDate, 'M/d', { locale: ja })}</span>
                         ) : (
-                          '期間を設定'
+                          '開始日を設定'
                         )}
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent
-                      className="w-auto p-4"
-                      align="start"
-                      side="right"
-                      collisionPadding={20}
-                      sideOffset={8}
-                    >
-                      <div className="max-h-[70vh] space-y-4 overflow-y-auto">
-                        <div>
-                          <p className="mb-2 text-sm font-medium">開始日</p>
-                          <Calendar
-                            mode="single"
-                            selected={startDate}
-                            onSelect={(date) => {
-                              setStartDate(date);
-                              onUpdate({ startDate: date || null });
-                            }}
-                          />
-                        </div>
-                        <Separator />
-                        <div>
-                          <p className="mb-2 text-sm font-medium">期限</p>
-                          <Calendar
-                            mode="single"
-                            selected={dueDate}
-                            onSelect={(date) => {
-                              setDueDate(date);
-                              onUpdate({ dueDate: date || null });
-                            }}
-                          />
-                        </div>
-                      </div>
+                    <PopoverContent className="w-auto p-4" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDate}
+                        onSelect={(date) => {
+                          setStartDate(date);
+                          onUpdate({ startDate: date || null });
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Due Date */}
+                <div className="flex items-center gap-3 py-2 text-sm">
+                  <CalendarIcon className="h-5 w-5 text-muted-foreground" />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="text-muted-foreground hover:text-foreground">
+                        {dueDate ? (
+                          <span>期限: {format(dueDate, 'M/d', { locale: ja })}</span>
+                        ) : (
+                          '期限を設定'
+                        )}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-4" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dueDate}
+                        onSelect={(date) => {
+                          setDueDate(date);
+                          onUpdate({ dueDate: date || null });
+                        }}
+                      />
                     </PopoverContent>
                   </Popover>
                 </div>
