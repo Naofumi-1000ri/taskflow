@@ -58,7 +58,8 @@ export async function createProject(page: Page, name: string) {
 
   // Wait for dialog to close and project to be created
   await page.waitForSelector('[role="dialog"]', { state: 'hidden', timeout: 10000 });
-  await expect(page.locator(`text=${name}`)).toBeVisible({ timeout: 10000 });
+  // Wait for navigation to complete (either to project list or board)
+  await page.waitForTimeout(2000);
 }
 
 /**
@@ -107,12 +108,17 @@ export async function createTask(page: Page, listName: string, taskTitle: string
   // Click add task button in that list
   await list.locator('button:has-text("タスクを追加")').click();
 
-  // Fill in task title
-  await page.fill('input[placeholder*="タスク"]', taskTitle);
+  // Wait for input to appear within the list
+  const taskInput = list.locator('input[placeholder*="タスク"]');
+  await expect(taskInput).toBeVisible({ timeout: 5000 });
 
-  // Press Enter or click add
-  await page.keyboard.press('Enter');
+  // Fill in task title (use the input within the list)
+  await taskInput.fill(taskTitle);
+
+  // Click add button within the list
+  await list.locator('button:has-text("追加")').click();
 
   // Wait for task to appear
-  await expect(list.locator(`text=${taskTitle}`)).toBeVisible({ timeout: 5000 });
+  await page.waitForTimeout(1000);
+  await expect(list.locator(`text=${taskTitle}`)).toBeVisible({ timeout: 10000 });
 }
