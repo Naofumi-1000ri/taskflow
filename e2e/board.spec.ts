@@ -7,13 +7,9 @@ test.describe('Board/Kanban', () => {
 
     // Navigate to projects page
     await page.goto('/projects');
-    await page.waitForLoadState('networkidle');
 
-    // Wait for page to load
-    await expect(page.getByRole('button', { name: '新規プロジェクト' })).toBeVisible({ timeout: 60000 });
-
-    // Wait for the page content to load
-    await page.waitForTimeout(3000);
+    // Wait for page to load (element-based, not networkidle due to Firebase)
+    await expect(page.getByRole('button', { name: '新規プロジェクト' })).toBeVisible({ timeout: 30000 });
   });
 
   test('should display board view when project exists', async ({ page }) => {
@@ -71,14 +67,15 @@ test.describe('Board/Kanban', () => {
     // Click add list button
     await page.click('text=リストを追加');
 
-    // Fill in list name
-    await page.fill('input[placeholder*="リスト名"]', listName);
+    // Fill in list name - use input inside the add list form
+    const listInput = page.locator('input[placeholder*="リスト名"]');
+    await listInput.fill(listName);
 
-    // Submit
-    await page.click('button:has-text("追加")');
+    // Submit - click the button next to the list input
+    await listInput.locator('..').locator('button:has-text("追加")').click();
 
-    // List should appear
-    await expect(page.locator(`text=${listName}`)).toBeVisible({ timeout: 10000 });
+    // List should appear as a board list header
+    await expect(page.locator(`[data-testid="board-list"] h3:has-text("${listName}")`)).toBeVisible({ timeout: 10000 });
   });
 
   test('should create a new task in list', async ({ page }) => {
@@ -95,30 +92,33 @@ test.describe('Board/Kanban', () => {
     await projectCards.first().click();
 
     // Wait for board to load
-    await expect(page.locator('text=リストを追加')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid="board-view"]')).toBeVisible({ timeout: 10000 });
 
-    // Check if any list exists by looking for "タスクを追加" buttons
-    const addTaskButtons = page.locator('button:has-text("タスクを追加")');
-    const listCount = await addTaskButtons.count();
+    // Check if any list exists
+    const lists = page.locator('[data-testid="board-list"]');
+    const listCount = await lists.count();
 
     if (listCount === 0) {
       await page.click('text=リストを追加');
-      await page.fill('input[placeholder*="リスト名"]', 'テストリスト');
-      await page.click('button:has-text("追加")');
-      await expect(page.locator('button:has-text("タスクを追加")')).toBeVisible({ timeout: 10000 });
+      const listInput = page.locator('input[placeholder*="リスト名"]');
+      await listInput.fill('テストリスト');
+      await listInput.locator('..').locator('button:has-text("追加")').click();
+      await expect(page.locator('[data-testid="board-list"]')).toBeVisible({ timeout: 10000 });
     }
 
     // Click add task button in first list
-    await page.locator('button:has-text("タスクを追加")').first().click();
+    const firstList = page.locator('[data-testid="board-list"]').first();
+    await firstList.locator('button:has-text("タスクを追加")').click();
 
-    // Fill in task title
-    await page.fill('input[placeholder*="タスク"]', taskTitle);
+    // Fill in task title within the list
+    const taskInput = firstList.locator('input[placeholder*="タスク"]');
+    await taskInput.fill(taskTitle);
 
-    // Press Enter
-    await page.keyboard.press('Enter');
+    // Click add button within the list
+    await firstList.locator('button:has-text("追加")').click();
 
     // Task should appear
-    await expect(page.locator(`text=${taskTitle}`)).toBeVisible({ timeout: 10000 });
+    await expect(firstList.locator(`text=${taskTitle}`)).toBeVisible({ timeout: 10000 });
   });
 
   test('should open task detail modal when clicking task', async ({ page }) => {
@@ -147,18 +147,19 @@ test.describe('Board/Kanban', () => {
     }
 
     // Look for existing tasks or create one
-    const taskCards = page.locator('[data-rbd-draggable-id]');
+    const taskCards = page.locator('[data-testid="task-card"]');
     const taskCount = await taskCards.count();
 
     if (taskCount === 0) {
-      await page.locator('button:has-text("タスクを追加")').first().click();
-      await page.fill('input[placeholder*="タスク"]', 'テストタスク');
-      await page.keyboard.press('Enter');
-      await page.waitForTimeout(2000);
+      const list = page.locator('[data-testid="board-list"]').first();
+      await list.locator('button:has-text("タスクを追加")').click();
+      await list.locator('input[placeholder*="タスク"]').fill('テストタスク');
+      await list.locator('button:has-text("追加")').click();
+      await page.waitForTimeout(1000);
     }
 
     // Click on first task
-    await page.locator('[data-rbd-draggable-id]').first().click();
+    await page.locator('[data-testid="task-card"]').first().click();
 
     // Modal should open
     await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 5000 });
@@ -189,22 +190,23 @@ test.describe('Board/Kanban', () => {
       await expect(page.locator('button:has-text("タスクを追加")')).toBeVisible({ timeout: 10000 });
     }
 
-    const taskCards = page.locator('[data-rbd-draggable-id]');
+    const taskCards = page.locator('[data-testid="task-card"]');
     const taskCount = await taskCards.count();
 
     if (taskCount === 0) {
-      await page.locator('button:has-text("タスクを追加")').first().click();
-      await page.fill('input[placeholder*="タスク"]', 'テストタスク');
-      await page.keyboard.press('Enter');
-      await page.waitForTimeout(2000);
+      const list = page.locator('[data-testid="board-list"]').first();
+      await list.locator('button:has-text("タスクを追加")').click();
+      await list.locator('input[placeholder*="タスク"]').fill('テストタスク');
+      await list.locator('button:has-text("追加")').click();
+      await page.waitForTimeout(1000);
     }
 
-    await page.locator('[data-rbd-draggable-id]').first().click();
+    await page.locator('[data-testid="task-card"]').first().click();
 
-    // Check tabs are visible
-    await expect(page.locator('text=詳細')).toBeVisible();
-    await expect(page.locator('text=チェックリスト')).toBeVisible();
-    await expect(page.locator('text=コメント')).toBeVisible();
-    await expect(page.locator('text=添付')).toBeVisible();
+    // Check modal elements are visible
+    await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 5000 });
+    // Check for elements that are always present
+    await expect(page.locator('text=チェックリストの新規作成')).toBeVisible();
+    await expect(page.locator('text=優先度')).toBeVisible();
   });
 });
