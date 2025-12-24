@@ -131,6 +131,7 @@ export function TaskDetailModal({
         setStartDate(task.startDate || undefined);
         setSelectedLabelIds(task.labelIds);
         setIsCompleted(task.isCompleted);
+        setCommentText(''); // Reset comment when task changes
       });
     }
   }, [task]);
@@ -256,7 +257,7 @@ export function TaskDetailModal({
                 onChange={(e) => setTitle(e.target.value)}
                 onBlur={handleSave}
                 className={cn(
-                  'border-none p-0 text-xl font-bold shadow-none focus-visible:ring-0',
+                  'border-none p-0 text-xl font-bold shadow-none focus-visible:ring-0 break-all',
                   isCompleted && 'line-through text-muted-foreground'
                 )}
               />
@@ -281,7 +282,7 @@ export function TaskDetailModal({
                     onBlur={handleSave}
                     placeholder="タスクの詳細を入力..."
                     rows={3}
-                    className="resize-none"
+                    className="resize-none break-all"
                   />
                 </div>
               )}
@@ -305,7 +306,7 @@ export function TaskDetailModal({
                         )}
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-4" align="start">
+                    <PopoverContent className="max-h-[70vh] w-auto overflow-y-auto p-4" align="start">
                       <div className="space-y-4">
                         <div>
                           <p className="mb-2 text-sm font-medium">開始日</p>
@@ -580,12 +581,12 @@ export function TaskDetailModal({
                   <div className="mb-4 space-y-3">
                     {comments.map((comment) => (
                       <div key={comment.id} className="flex gap-3">
-                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
+                        <div className="h-8 w-8 flex-shrink-0 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
                           {comment.authorId.slice(0, 2).toUpperCase()}
                         </div>
-                        <div className="flex-1">
+                        <div className="min-w-0 flex-1">
                           <div className="rounded-lg bg-muted p-3">
-                            <p className="text-sm">{comment.content}</p>
+                            <p className="break-all text-sm">{comment.content}</p>
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">
                             {format(comment.createdAt, 'M/d HH:mm', { locale: ja })}
@@ -603,9 +604,9 @@ export function TaskDetailModal({
                     onChange={(e) => setCommentText(e.target.value)}
                     placeholder="コメントを書く"
                     rows={3}
-                    className="resize-none border-none p-0 shadow-none focus-visible:ring-0"
+                    className="resize-none break-all border-none p-0 shadow-none focus-visible:ring-0"
                   />
-                  <div className="mt-2 flex items-center justify-end">
+                  <div className="mt-2 flex flex-shrink-0 items-center justify-end">
                     <Button
                       size="sm"
                       onClick={handleAddComment}
@@ -730,7 +731,7 @@ function ChecklistCard({
                 />
                 <span
                   className={cn(
-                    'flex-1 text-sm',
+                    'min-w-0 flex-1 break-all text-sm',
                     item.isChecked && 'text-muted-foreground line-through'
                   )}
                 >
