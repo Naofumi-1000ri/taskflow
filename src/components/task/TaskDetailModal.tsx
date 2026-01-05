@@ -271,7 +271,7 @@ export function TaskDetailModal({
           </DialogHeader>
 
           {/* Content */}
-          <ScrollArea className="flex-1">
+          <ScrollArea className="min-h-0 flex-1">
             <div className="space-y-1 px-6 py-4">
               {/* Description (if editing) */}
               {description !== undefined && (
