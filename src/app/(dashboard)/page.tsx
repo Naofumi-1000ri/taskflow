@@ -72,9 +72,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 pb-6">
-      {/* Personal Memo - at top */}
-      <PersonalMemo />
-
       {/* Welcome Section */}
       <div>
         <h1 className="text-2xl font-bold">
@@ -102,7 +99,9 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-1">
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Personal Memo */}
+        <PersonalMemo />
 
         {/* Projects */}
         <Card>
