@@ -44,7 +44,7 @@ export default function DashboardLayout({
         <Sidebar />
         <main
           className={cn(
-            'flex min-h-0 flex-1 flex-col overflow-hidden bg-gray-50 p-4 lg:ml-0 lg:p-6',
+            'flex min-h-0 flex-1 flex-col overflow-y-auto bg-gray-50 p-4 lg:ml-0 lg:p-6',
             isSidebarOpen && (isSidebarCollapsed ? 'ml-16' : 'ml-64')
           )}
         >

@@ -71,7 +71,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-6">
+      {/* Personal Memo - at top */}
+      <PersonalMemo />
+
       {/* Welcome Section */}
       <div>
         <h1 className="text-2xl font-bold">
@@ -99,9 +102,7 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Personal Memo */}
-        <PersonalMemo />
+      <div className="grid gap-6 lg:grid-cols-1">
 
         {/* Projects */}
         <Card>
@@ -147,9 +148,11 @@ export default function DashboardPage() {
                         />
                       ) : (
                         <div
-                          className="h-10 w-10 rounded-lg"
+                          className="flex h-10 w-10 items-center justify-center rounded-lg text-lg"
                           style={{ backgroundColor: project.color }}
-                        />
+                        >
+                          {project.icon}
+                        </div>
                       )}
                       <div className="flex-1">
                         <p className="font-medium">{project.name}</p>
