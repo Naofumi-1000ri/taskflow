@@ -119,9 +119,11 @@ export function Sidebar() {
                     />
                   ) : (
                     <div
-                      className="h-3 w-3 shrink-0 rounded"
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-xs"
                       style={{ backgroundColor: project.color }}
-                    />
+                    >
+                      {project.icon}
+                    </div>
                   )}
                   {!isSidebarCollapsed && (
                     <span className="truncate">{project.name}</span>
