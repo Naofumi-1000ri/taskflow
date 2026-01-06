@@ -77,3 +77,87 @@ export function formatFileSize(bytes: number): string {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
+
+// Maximum file size for project icons (5MB)
+const MAX_ICON_SIZE = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+export async function uploadProjectIcon(
+  projectId: string,
+  file: File
+): Promise<string> {
+  // Validate file type
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    throw new Error('画像ファイル（JPG, PNG, GIF, WebP）のみアップロード可能です');
+  }
+
+  // Validate file size
+  if (file.size > MAX_ICON_SIZE) {
+    throw new Error('ファイルサイズは5MB以下にしてください');
+  }
+
+  const storage = getFirebaseStorage();
+  const timestamp = Date.now();
+  const extension = file.name.split('.').pop() || 'png';
+  const fileName = `icon_${timestamp}.${extension}`;
+  const filePath = `projects/${projectId}/icon/${fileName}`;
+  const fileRef = ref(storage, filePath);
+
+  await uploadBytes(fileRef, file);
+  const url = await getDownloadURL(fileRef);
+
+  return url;
+}
+
+export async function deleteProjectIcon(
+  projectId: string,
+  iconUrl: string
+): Promise<void> {
+  const storage = getFirebaseStorage();
+
+  try {
+    // Extract file path from URL
+    const urlPath = new URL(iconUrl).pathname;
+    const decodedPath = decodeURIComponent(urlPath);
+    // Firebase storage URLs have format: /v0/b/{bucket}/o/{encoded_path}
+    const match = decodedPath.match(/\/o\/(.+)$/);
+    if (match) {
+      const storagePath = match[1].split('?')[0];
+      const fileRef = ref(storage, storagePath);
+      await deleteObject(fileRef);
+    }
+  } catch (error) {
+    console.warn('Failed to delete project icon from storage:', error);
+  }
+}
+
+// Maximum file size for comment attachments (10MB)
+const MAX_COMMENT_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+
+export async function uploadCommentAttachment(
+  projectId: string,
+  taskId: string,
+  file: File
+): Promise<{ id: string; url: string; name: string; type: string; size: number }> {
+  // Validate file size
+  if (file.size > MAX_COMMENT_ATTACHMENT_SIZE) {
+    throw new Error('ファイルサイズは10MB以下にしてください');
+  }
+
+  const storage = getFirebaseStorage();
+  const timestamp = Date.now();
+  const fileName = `${timestamp}_${file.name}`;
+  const filePath = `projects/${projectId}/tasks/${taskId}/comment_attachments/${fileName}`;
+  const fileRef = ref(storage, filePath);
+
+  await uploadBytes(fileRef, file);
+  const url = await getDownloadURL(fileRef);
+
+  return {
+    id: `${timestamp}`,
+    url,
+    name: file.name,
+    type: file.type,
+    size: file.size,
+  };
+}

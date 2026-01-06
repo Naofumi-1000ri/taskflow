@@ -19,6 +19,7 @@ const createTask = (overrides: Partial<Task> = {}): Task => ({
   order: 0,
   assigneeIds: [],
   labelIds: [],
+  tagIds: [],
   priority: null,
   startDate: null,
   dueDate: null,

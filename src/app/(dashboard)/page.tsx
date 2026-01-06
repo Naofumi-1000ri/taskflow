@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarDays, FolderKanban, Plus, WifiOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useUIStore } from '@/stores/uiStore';
+import { PersonalMemo } from '@/components/dashboard/PersonalMemo';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -158,10 +159,18 @@ export default function DashboardPage() {
                     className="block"
                   >
                     <div className="flex items-center gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/50">
-                      <div
-                        className="h-10 w-10 rounded-lg"
-                        style={{ backgroundColor: project.color }}
-                      />
+                      {project.iconUrl ? (
+                        <img
+                          src={project.iconUrl}
+                          alt={project.name}
+                          className="h-10 w-10 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="h-10 w-10 rounded-lg"
+                          style={{ backgroundColor: project.color }}
+                        />
+                      )}
                       <div className="flex-1">
                         <p className="font-medium">{project.name}</p>
                         <p className="text-sm text-muted-foreground">
@@ -175,6 +184,11 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* Personal Memo */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <PersonalMemo />
       </div>
     </div>
   );

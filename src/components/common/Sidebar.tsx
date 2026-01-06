@@ -111,10 +111,18 @@ export function Sidebar() {
                     isSidebarCollapsed && 'justify-center px-2'
                   )}
                 >
-                  <div
-                    className="h-3 w-3 shrink-0 rounded"
-                    style={{ backgroundColor: project.color }}
-                  />
+                  {project.iconUrl ? (
+                    <img
+                      src={project.iconUrl}
+                      alt={project.name}
+                      className="h-5 w-5 shrink-0 rounded object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="h-3 w-3 shrink-0 rounded"
+                      style={{ backgroundColor: project.color }}
+                    />
+                  )}
                   {!isSidebarCollapsed && (
                     <span className="truncate">{project.name}</span>
                   )}

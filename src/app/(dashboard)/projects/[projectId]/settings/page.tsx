@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useProject } from '@/hooks/useProjects';
 import { Button } from '@/components/ui/button';
@@ -12,10 +12,11 @@ import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { LIST_COLORS } from '@/types';
-import type { User, ProjectRole } from '@/types';
+import type { User, ProjectRole, ProjectUrl } from '@/types';
 import { cn } from '@/lib/utils';
-import { Loader2, Trash2, UserPlus, X } from 'lucide-react';
+import { Loader2, Trash2, UserPlus, X, Upload, Link as LinkIcon, Plus, ExternalLink } from 'lucide-react';
 import { getUsersByIds, getAllUsers } from '@/lib/firebase/firestore';
+import { uploadProjectIcon, deleteProjectIcon } from '@/lib/firebase/storage';
 import {
   Dialog,
   DialogContent,
@@ -43,8 +44,17 @@ export default function ProjectSettingsPage() {
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('');
   const [icon, setIcon] = useState('');
+  const [iconUrl, setIconUrl] = useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingIcon, setIsUploadingIcon] = useState(false);
   const [memberUsers, setMemberUsers] = useState<User[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Project URLs state
+  const [urls, setUrls] = useState<ProjectUrl[]>([]);
+  const [newUrlTitle, setNewUrlTitle] = useState('');
+  const [newUrlValue, setNewUrlValue] = useState('');
+  const [isAddingUrl, setIsAddingUrl] = useState(false);
 
   // Invite member state
   const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -59,6 +69,8 @@ export default function ProjectSettingsPage() {
       setDescription(project.description);
       setColor(project.color);
       setIcon(project.icon);
+      setIconUrl(project.iconUrl);
+      setUrls(project.urls || []);
     }
   }, [project]);
 
@@ -95,10 +107,69 @@ export default function ProjectSettingsPage() {
         description: description || project.description,
         color: color || project.color,
         icon: icon || project.icon,
+        iconUrl: iconUrl,
+        urls: urls,
       });
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleIconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingIcon(true);
+    try {
+      const url = await uploadProjectIcon(projectId, file);
+      setIconUrl(url);
+      // Save immediately
+      await update({ iconUrl: url });
+    } catch (error) {
+      console.error('Failed to upload icon:', error);
+      alert(error instanceof Error ? error.message : 'アイコンのアップロードに失敗しました');
+    } finally {
+      setIsUploadingIcon(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveIcon = async () => {
+    if (!iconUrl) return;
+    if (!confirm('アイコン画像を削除しますか？')) return;
+
+    try {
+      await deleteProjectIcon(projectId, iconUrl);
+      setIconUrl(undefined);
+      await update({ iconUrl: undefined });
+    } catch (error) {
+      console.error('Failed to remove icon:', error);
+    }
+  };
+
+  const handleAddUrl = async () => {
+    if (!newUrlTitle.trim() || !newUrlValue.trim()) return;
+
+    const newUrl: ProjectUrl = {
+      id: Date.now().toString(),
+      title: newUrlTitle.trim(),
+      url: newUrlValue.trim(),
+    };
+
+    const newUrls = [...urls, newUrl];
+    setUrls(newUrls);
+    setNewUrlTitle('');
+    setNewUrlValue('');
+    setIsAddingUrl(false);
+    await update({ urls: newUrls });
+  };
+
+  const handleRemoveUrl = async (urlId: string) => {
+    const newUrls = urls.filter((u) => u.id !== urlId);
+    setUrls(newUrls);
+    await update({ urls: newUrls });
   };
 
   const handleInviteUser = async (userId: string) => {
@@ -146,47 +217,98 @@ export default function ProjectSettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Icon Selection */}
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label>アイコン</Label>
-              <div className="flex flex-wrap gap-2">
-                {PROJECT_ICONS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    type="button"
-                    onClick={() => setIcon(emoji)}
-                    className={cn(
-                      'flex h-10 w-10 items-center justify-center rounded-lg border-2 text-xl transition-colors',
-                      (icon || project.icon) === emoji
-                        ? 'border-primary bg-primary/10'
-                        : 'border-transparent bg-muted hover:bg-muted/80'
-                    )}
+
+              {/* Custom Image Icon */}
+              <div className="flex items-center gap-4">
+                {iconUrl ? (
+                  <div className="relative">
+                    <img
+                      src={iconUrl}
+                      alt="プロジェクトアイコン"
+                      className="h-16 w-16 rounded-lg object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveIcon}
+                      className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/50 hover:border-primary hover:bg-muted/50"
                   >
-                    {emoji}
-                  </button>
-                ))}
+                    {isUploadingIcon ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    ) : (
+                      <Upload className="h-6 w-6 text-muted-foreground" />
+                    )}
+                  </div>
+                )}
+                <div className="text-sm text-muted-foreground">
+                  <p>画像をアップロード</p>
+                  <p className="text-xs">JPG, PNG, GIF, WebP (最大5MB)</p>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  onChange={handleIconUpload}
+                  className="hidden"
+                />
               </div>
+
+              {/* Emoji Icons (only show when no custom image) */}
+              {!iconUrl && (
+                <>
+                  <div className="text-sm text-muted-foreground">または絵文字を選択</div>
+                  <div className="flex flex-wrap gap-2">
+                    {PROJECT_ICONS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => setIcon(emoji)}
+                        className={cn(
+                          'flex h-10 w-10 items-center justify-center rounded-lg border-2 text-xl transition-colors',
+                          (icon || project.icon) === emoji
+                            ? 'border-primary bg-primary/10'
+                            : 'border-transparent bg-muted hover:bg-muted/80'
+                        )}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Color Selection */}
-            <div className="space-y-2">
-              <Label>カラー</Label>
-              <div className="flex flex-wrap gap-2">
-                {LIST_COLORS.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() => setColor(c.value)}
-                    className={cn(
-                      'h-8 w-8 rounded-full transition-all',
-                      (color || project.color) === c.value
-                        ? 'ring-2 ring-offset-2 ring-primary'
-                        : 'hover:scale-110'
-                    )}
-                    style={{ backgroundColor: c.value }}
-                  />
-                ))}
+            {/* Color Selection (only show when no custom iconUrl) */}
+            {!iconUrl && (
+              <div className="space-y-2">
+                <Label>カラー</Label>
+                <div className="flex flex-wrap gap-2">
+                  {LIST_COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      onClick={() => setColor(c.value)}
+                      className={cn(
+                        'h-8 w-8 rounded-full transition-all',
+                        (color || project.color) === c.value
+                          ? 'ring-2 ring-offset-2 ring-primary'
+                          : 'hover:scale-110'
+                      )}
+                      style={{ backgroundColor: c.value }}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Name */}
             <div className="space-y-2">
@@ -340,6 +462,98 @@ export default function ProjectSettingsPage() {
                 </div>
               </DialogContent>
             </Dialog>
+          </CardContent>
+        </Card>
+
+        {/* Project URLs */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <LinkIcon className="h-5 w-5" />
+              関連URL
+            </CardTitle>
+            <CardDescription>
+              プロジェクトに関連するURLを管理します
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {urls.map((urlItem) => (
+                <div
+                  key={urlItem.id}
+                  className="flex items-center justify-between rounded-lg border p-3"
+                >
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <ExternalLink className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                    <div className="overflow-hidden">
+                      <p className="truncate text-sm font-medium">{urlItem.title}</p>
+                      <a
+                        href={urlItem.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="truncate text-xs text-blue-600 hover:underline"
+                      >
+                        {urlItem.url}
+                      </a>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 flex-shrink-0 text-red-600 hover:bg-red-50 hover:text-red-700"
+                    onClick={() => handleRemoveUrl(urlItem.id)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+
+              {isAddingUrl ? (
+                <div className="space-y-3 rounded-lg border p-3">
+                  <Input
+                    value={newUrlTitle}
+                    onChange={(e) => setNewUrlTitle(e.target.value)}
+                    placeholder="タイトル（例: デザインファイル）"
+                    autoFocus
+                  />
+                  <Input
+                    value={newUrlValue}
+                    onChange={(e) => setNewUrlValue(e.target.value)}
+                    placeholder="URL（例: https://figma.com/...）"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                        handleAddUrl();
+                      }
+                    }}
+                  />
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleAddUrl}>
+                      追加
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setIsAddingUrl(false);
+                        setNewUrlTitle('');
+                        setNewUrlValue('');
+                      }}
+                    >
+                      キャンセル
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setIsAddingUrl(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  URLを追加
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
 

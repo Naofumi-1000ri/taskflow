@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Bell, Menu, Search, User, Settings, LogOut } from 'lucide-react';
+import { Menu, Search, User, Settings, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -15,6 +15,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
+import { NotificationDropdown } from './NotificationDropdown';
 
 export function Header() {
   const { user, signOut } = useAuth();
@@ -41,12 +42,12 @@ export function Header() {
         <span className="sr-only">Toggle sidebar</span>
       </Button>
 
-      <div className="flex items-center gap-2">
+      <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
           TF
         </div>
         <span className="hidden font-semibold md:inline-block">TaskFlow</span>
-      </div>
+      </Link>
 
       <div className="min-w-0 flex-1">
         <form>
@@ -62,11 +63,7 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500" />
-          <span className="sr-only">Notifications</span>
-        </Button>
+        <NotificationDropdown />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

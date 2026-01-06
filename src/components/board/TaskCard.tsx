@@ -5,11 +5,19 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { Calendar } from 'lucide-react';
+import { Calendar, Bell } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { getUsersByIds, getTaskAttachments } from '@/lib/firebase/firestore';
+import { getUsersByIds, getTaskAttachments, getProject } from '@/lib/firebase/firestore';
+import { useNotifications } from '@/hooks/useNotifications';
 import type { Task, Label, Tag, User as UserType, Attachment } from '@/types';
 import { isTaskOverdue } from '@/lib/utils/task';
 
@@ -25,6 +33,11 @@ interface TaskCardProps {
 export function TaskCard({ projectId, task, labels, tags, onClick, isDragging }: TaskCardProps) {
   const [assignees, setAssignees] = useState<UserType[]>([]);
   const [imageAttachments, setImageAttachments] = useState<Attachment[]>([]);
+  const [bellMessage, setBellMessage] = useState('');
+  const [isBellOpen, setIsBellOpen] = useState(false);
+  const [isSendingBell, setIsSendingBell] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const { sendBellNotification } = useNotifications();
 
   const {
     attributes,
@@ -63,6 +76,36 @@ export function TaskCard({ projectId, task, labels, tags, onClick, isDragging }:
     }
   }, [projectId, task.id]);
 
+  // Fetch project name for notifications
+  useEffect(() => {
+    if (projectId) {
+      getProject(projectId).then((project) => {
+        if (project) setProjectName(project.name);
+      });
+    }
+  }, [projectId]);
+
+  const handleSendBellNotification = async () => {
+    if (!projectId || !task.id) return;
+
+    setIsSendingBell(true);
+    try {
+      await sendBellNotification(
+        projectId,
+        projectName,
+        task.id,
+        task.title,
+        bellMessage
+      );
+      setBellMessage('');
+      setIsBellOpen(false);
+    } catch (error) {
+      console.error('Failed to send notification:', error);
+    } finally {
+      setIsSendingBell(false);
+    }
+  };
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -90,7 +133,7 @@ export function TaskCard({ projectId, task, labels, tags, onClick, isDragging }:
       onClick={onClick}
       data-testid="task-card"
       className={cn(
-        'cursor-pointer rounded-lg border bg-white shadow-sm transition-shadow hover:shadow-md',
+        'group cursor-pointer rounded-lg border bg-white shadow-sm transition-shadow hover:shadow-md',
         (isDragging || isSortableDragging) && 'opacity-50 shadow-lg',
         task.isCompleted && 'opacity-60'
       )}
@@ -150,15 +193,57 @@ export function TaskCard({ projectId, task, labels, tags, onClick, isDragging }:
           </div>
         )}
 
-        {/* Title */}
-        <p
-          className={cn(
-            'text-sm font-medium',
-            task.isCompleted && 'line-through text-muted-foreground'
-          )}
-        >
-          {task.title}
-        </p>
+        {/* Title Row with Bell */}
+        <div className="flex items-start justify-between gap-2">
+          <p
+            className={cn(
+              'flex-1 text-sm font-medium',
+              task.isCompleted && 'line-through text-muted-foreground'
+            )}
+          >
+            {task.title}
+          </p>
+          <Popover open={isBellOpen} onOpenChange={setIsBellOpen}>
+            <PopoverTrigger asChild>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsBellOpen(true);
+                }}
+                className="flex-shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+              >
+                <Bell className="h-3.5 w-3.5" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-64"
+              align="end"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="space-y-2">
+                <p className="text-sm font-medium">メンバーに通知</p>
+                <Input
+                  value={bellMessage}
+                  onChange={(e) => setBellMessage(e.target.value)}
+                  placeholder="メッセージ（任意）"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                      handleSendBellNotification();
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  className="w-full"
+                  onClick={handleSendBellNotification}
+                  disabled={isSendingBell}
+                >
+                  {isSendingBell ? '送信中...' : '通知を送信'}
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
 
         {/* Description - truncated */}
         {task.description && (

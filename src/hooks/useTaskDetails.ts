@@ -15,8 +15,8 @@ import {
   deleteAttachment,
   subscribeToTaskAttachments,
 } from '@/lib/firebase/firestore';
-import { uploadFile, deleteFile } from '@/lib/firebase/storage';
-import type { Task, Checklist, ChecklistItem, Comment, Attachment } from '@/types';
+import { uploadFile, deleteFile, uploadCommentAttachment } from '@/lib/firebase/storage';
+import type { Task, Checklist, ChecklistItem, Comment, Attachment, CommentAttachment } from '@/types';
 
 export function useTaskDetails(projectId: string | null, taskId: string | null) {
   const [task, setTask] = useState<Task | null>(null);
@@ -184,18 +184,46 @@ export function useTaskDetails(projectId: string | null, taskId: string | null) 
     [projectId, taskId, checklists]
   );
 
-  // Add comment
+  // Add comment (with optional attachments)
   const addComment = useCallback(
-    async (content: string, authorId: string, mentions: string[] = []) => {
+    async (content: string, authorId: string, mentions: string[] = [], files: File[] = []) => {
       if (!projectId || !taskId) return;
+
+      // Upload attachments first
+      let commentAttachments: CommentAttachment[] = [];
+      if (files.length > 0) {
+        const uploadPromises = files.map((file) =>
+          uploadCommentAttachment(projectId, taskId, file)
+        );
+        commentAttachments = await Promise.all(uploadPromises);
+      }
+
       await createComment(projectId, taskId, {
         content,
         authorId,
         mentions,
+        attachments: commentAttachments.length > 0 ? commentAttachments : undefined,
       });
     },
     [projectId, taskId]
   );
+
+  // Get all comment attachments (for displaying at task top)
+  const getAllCommentAttachments = useCallback(() => {
+    const allAttachments: { commentId: string; attachment: CommentAttachment; createdAt: Date }[] = [];
+    comments.forEach((comment) => {
+      if (comment.attachments && comment.attachments.length > 0) {
+        comment.attachments.forEach((att) => {
+          allAttachments.push({
+            commentId: comment.id,
+            attachment: att,
+            createdAt: comment.createdAt,
+          });
+        });
+      }
+    });
+    return allAttachments.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }, [comments]);
 
   // Upload attachment
   const uploadAttachment = useCallback(
@@ -236,6 +264,7 @@ export function useTaskDetails(projectId: string | null, taskId: string | null) 
     toggleChecklistItem,
     removeChecklistItem,
     addComment,
+    getAllCommentAttachments,
     uploadAttachment,
     removeAttachment,
   };

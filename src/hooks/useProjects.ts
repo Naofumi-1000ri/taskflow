@@ -14,7 +14,7 @@ import {
   removeProjectMember,
   updateMemberRole,
 } from '@/lib/firebase/firestore';
-import type { Project, ProjectMember, ProjectRole } from '@/types';
+import type { Project, ProjectMember, ProjectRole, ProjectUrl } from '@/types';
 
 export function useProjects() {
   const { firebaseUser } = useAuthStore();
@@ -84,7 +84,7 @@ export function useProjects() {
   const update = useCallback(
     async (
       projectId: string,
-      data: Partial<{ name: string; description: string; color: string; icon: string }>
+      data: Partial<{ name: string; description: string; color: string; icon: string; iconUrl?: string; urls?: ProjectUrl[] }>
     ) => {
       try {
         await updateProject(projectId, data);
@@ -165,7 +165,7 @@ export function useProject(projectId: string | null) {
 
   // Update project
   const update = useCallback(
-    async (data: Partial<{ name: string; description: string; color: string; icon: string }>) => {
+    async (data: Partial<{ name: string; description: string; color: string; icon: string; iconUrl?: string; urls?: ProjectUrl[] }>) => {
       if (!projectId) return;
       try {
         await updateProject(projectId, data);

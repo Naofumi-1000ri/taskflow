@@ -43,8 +43,12 @@ import {
   Flag,
   Plus,
   Check,
+  Paperclip,
+  FileIcon,
+  Image as ImageIcon,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { formatFileSize, getFileIcon } from '@/lib/firebase/storage';
+import { cn, linkifyText } from '@/lib/utils';
 import { useTaskDetails } from '@/hooks/useTaskDetails';
 import { useAuthStore } from '@/stores/authStore';
 import { getProject, getProjectTags, createTag } from '@/lib/firebase/firestore';
@@ -83,6 +87,7 @@ export function TaskDetailModal({
     toggleChecklistItem,
     removeChecklistItem,
     addComment,
+    getAllCommentAttachments,
   } = useTaskDetails(projectId, task?.id || null);
 
   const [title, setTitle] = useState('');
@@ -94,6 +99,8 @@ export function TaskDetailModal({
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [isCompleted, setIsCompleted] = useState(false);
   const [commentText, setCommentText] = useState('');
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [expandedChecklists, setExpandedChecklists] = useState<Set<string>>(new Set());
   const [projectMemberIds, setProjectMemberIds] = useState<string[]>([]);
   const [projectTags, setProjectTags] = useState<TagType[]>([]);
@@ -132,6 +139,7 @@ export function TaskDetailModal({
         setSelectedLabelIds(task.labelIds);
         setIsCompleted(task.isCompleted);
         setCommentText(''); // Reset comment when task changes
+        setPendingFiles([]);
       });
     }
   }, [task]);
@@ -199,11 +207,35 @@ export function TaskDetailModal({
   };
 
   const handleAddComment = async () => {
-    if (user && commentText.trim()) {
-      await addComment(commentText.trim(), user.id, []);
-      setCommentText('');
+    if (user && (commentText.trim() || pendingFiles.length > 0)) {
+      setIsSubmittingComment(true);
+      try {
+        await addComment(commentText.trim(), user.id, [], pendingFiles);
+        setCommentText('');
+        setPendingFiles([]);
+      } catch (error) {
+        console.error('Failed to add comment:', error);
+        alert(error instanceof Error ? error.message : 'コメントの投稿に失敗しました');
+      } finally {
+        setIsSubmittingComment(false);
+      }
     }
   };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      setPendingFiles((prev) => [...prev, ...Array.from(files)]);
+    }
+    e.target.value = '';
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Get all comment attachments for Jooto-style display at task top
+  const commentAttachments = getAllCommentAttachments();
 
   const toggleChecklistExpanded = (checklistId: string) => {
     setExpandedChecklists(prev => {
@@ -273,6 +305,43 @@ export function TaskDetailModal({
           {/* Content */}
           <ScrollArea className="min-h-0 flex-1">
             <div className="space-y-1 px-6 py-4">
+              {/* Comment Attachments (Jooto-style at top) */}
+              {commentAttachments.length > 0 && (
+                <div className="mb-4">
+                  <div className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <Paperclip className="h-4 w-4" />
+                    添付ファイル ({commentAttachments.length})
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {commentAttachments.map(({ attachment }) => (
+                      <a
+                        key={attachment.id}
+                        href={attachment.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex items-center gap-2 rounded-lg border p-2 hover:bg-muted"
+                      >
+                        {attachment.type.startsWith('image/') ? (
+                          <img
+                            src={attachment.url}
+                            alt={attachment.name}
+                            className="h-10 w-10 rounded object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-10 w-10 items-center justify-center rounded bg-muted">
+                            <FileIcon className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-medium">{attachment.name}</p>
+                          <p className="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</p>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Description (if editing) */}
               {description !== undefined && (
                 <div className="mb-4">
@@ -591,7 +660,30 @@ export function TaskDetailModal({
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="rounded-lg bg-muted p-3">
-                            <p className="break-all text-sm">{comment.content}</p>
+                            {comment.content && (
+                              <p className="break-all whitespace-pre-wrap text-sm">{linkifyText(comment.content)}</p>
+                            )}
+                            {/* Comment Attachments */}
+                            {comment.attachments && comment.attachments.length > 0 && (
+                              <div className={cn("flex flex-wrap gap-2", comment.content && "mt-2")}>
+                                {comment.attachments.map((att) => (
+                                  <a
+                                    key={att.id}
+                                    href={att.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted"
+                                  >
+                                    {att.type.startsWith('image/') ? (
+                                      <ImageIcon className="h-3 w-3" />
+                                    ) : (
+                                      <FileIcon className="h-3 w-3" />
+                                    )}
+                                    <span className="max-w-[100px] truncate">{att.name}</span>
+                                  </a>
+                                ))}
+                              </div>
+                            )}
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">
                             {format(comment.createdAt, 'M/d HH:mm', { locale: ja })}
@@ -611,13 +703,47 @@ export function TaskDetailModal({
                     rows={3}
                     className="resize-none break-all border-none p-0 shadow-none focus-visible:ring-0"
                   />
-                  <div className="mt-2 flex flex-shrink-0 items-center justify-end">
+                  {/* Pending Files Preview */}
+                  {pendingFiles.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {pendingFiles.map((file, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-1 rounded border bg-muted px-2 py-1 text-xs"
+                        >
+                          {file.type.startsWith('image/') ? (
+                            <ImageIcon className="h-3 w-3" />
+                          ) : (
+                            <FileIcon className="h-3 w-3" />
+                          )}
+                          <span className="max-w-[100px] truncate">{file.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => removePendingFile(index)}
+                            className="ml-1 text-muted-foreground hover:text-foreground"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-2 flex flex-shrink-0 items-center justify-between">
+                    <label className="cursor-pointer text-muted-foreground hover:text-foreground">
+                      <Paperclip className="h-4 w-4" />
+                      <input
+                        type="file"
+                        multiple
+                        onChange={handleFileSelect}
+                        className="hidden"
+                      />
+                    </label>
                     <Button
                       size="sm"
                       onClick={handleAddComment}
-                      disabled={!commentText.trim()}
+                      disabled={(!commentText.trim() && pendingFiles.length === 0) || isSubmittingComment}
                     >
-                      コメントを投稿
+                      {isSubmittingComment ? 'アップロード中...' : 'コメントを投稿'}
                     </Button>
                   </div>
                 </div>

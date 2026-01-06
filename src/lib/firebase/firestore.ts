@@ -6,6 +6,7 @@ import {
   deleteDoc,
   getDoc,
   getDocs,
+  setDoc,
   query,
   where,
   orderBy,
@@ -29,6 +30,7 @@ import type {
   Checklist,
   Attachment,
   User,
+  Notification,
 } from '@/types';
 import { DEFAULT_TAGS } from '@/types';
 
@@ -870,4 +872,132 @@ export function subscribeToUsers(
     });
     callback(users);
   });
+}
+
+// ==================== User Memo ====================
+
+export async function getUserMemo(userId: string): Promise<string> {
+  const db = getFirebaseDb();
+  const docRef = doc(db, 'userMemos', userId);
+  const snapshot = await getDoc(docRef);
+
+  if (!snapshot.exists()) {
+    return '';
+  }
+
+  return snapshot.data().content || '';
+}
+
+export async function updateUserMemo(
+  userId: string,
+  content: string
+): Promise<void> {
+  const db = getFirebaseDb();
+  const docRef = doc(db, 'userMemos', userId);
+
+  await setDoc(
+    docRef,
+    {
+      userId,
+      content,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+export function subscribeToUserMemo(
+  userId: string,
+  callback: (content: string) => void
+): () => void {
+  const db = getFirebaseDb();
+  const docRef = doc(db, 'userMemos', userId);
+
+  return onSnapshot(docRef, (snapshot) => {
+    if (snapshot.exists()) {
+      callback(snapshot.data().content || '');
+    } else {
+      callback('');
+    }
+  });
+}
+
+// ==================== Notifications ====================
+
+export async function createNotification(
+  notification: Omit<Notification, 'id' | 'createdAt'>
+): Promise<string> {
+  const db = getFirebaseDb();
+  const notifRef = await addDoc(collection(db, 'notifications'), {
+    ...notification,
+    createdAt: serverTimestamp(),
+  });
+  return notifRef.id;
+}
+
+export async function getUserNotifications(userId: string): Promise<Notification[]> {
+  const db = getFirebaseDb();
+  const q = query(
+    collection(db, 'notifications'),
+    where('userId', '==', userId),
+    orderBy('createdAt', 'desc')
+  );
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+    createdAt: toDate(doc.data().createdAt),
+  })) as Notification[];
+}
+
+export function subscribeToUserNotifications(
+  userId: string,
+  callback: (notifications: Notification[]) => void
+): () => void {
+  const db = getFirebaseDb();
+  const q = query(
+    collection(db, 'notifications'),
+    where('userId', '==', userId),
+    orderBy('createdAt', 'desc')
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const notifications = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: toDate(doc.data().createdAt),
+    })) as Notification[];
+    callback(notifications);
+  });
+}
+
+export async function markNotificationAsRead(notificationId: string): Promise<void> {
+  const db = getFirebaseDb();
+  await updateDoc(doc(db, 'notifications', notificationId), {
+    isRead: true,
+  });
+}
+
+export async function markAllNotificationsAsRead(userId: string): Promise<void> {
+  const db = getFirebaseDb();
+  const q = query(
+    collection(db, 'notifications'),
+    where('userId', '==', userId),
+    where('isRead', '==', false)
+  );
+
+  const snapshot = await getDocs(q);
+  const batch = writeBatch(db);
+
+  snapshot.docs.forEach((doc) => {
+    batch.update(doc.ref, { isRead: true });
+  });
+
+  await batch.commit();
+}
+
+export async function deleteNotification(notificationId: string): Promise<void> {
+  const db = getFirebaseDb();
+  await deleteDoc(doc(db, 'notifications', notificationId));
 }

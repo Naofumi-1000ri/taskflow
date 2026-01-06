@@ -30,22 +30,33 @@ export function ProjectCard({
 }: ProjectCardProps) {
   return (
     <Card className="group relative overflow-hidden transition-shadow hover:shadow-md" data-testid="project-card">
-      <div
-        className="absolute inset-x-0 top-0 h-1"
-        style={{ backgroundColor: project.color }}
-      />
+      {/* Color bar only shown when no iconUrl */}
+      {!project.iconUrl && (
+        <div
+          className="absolute inset-x-0 top-0 h-1"
+          style={{ backgroundColor: project.color }}
+        />
+      )}
 
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
         <Link
           href={`/projects/${project.id}/board`}
           className="flex items-center gap-3"
         >
-          <div
-            className="flex h-10 w-10 items-center justify-center rounded-lg text-xl"
-            style={{ backgroundColor: `${project.color}20` }}
-          >
-            {project.icon}
-          </div>
+          {project.iconUrl ? (
+            <img
+              src={project.iconUrl}
+              alt={project.name}
+              className="h-10 w-10 rounded-lg object-cover"
+            />
+          ) : (
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-xl"
+              style={{ backgroundColor: `${project.color}20` }}
+            >
+              {project.icon}
+            </div>
+          )}
           <div>
             <h3 className="font-semibold leading-none tracking-tight hover:underline">
               {project.name}

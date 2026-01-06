@@ -14,12 +14,21 @@ export interface Project {
   name: string;
   description: string;
   icon: string;
+  iconUrl?: string; // Custom icon image URL (overrides emoji icon)
   color: string;
   ownerId: string;
   memberIds: string[];
+  urls?: ProjectUrl[]; // Related URLs for the project
   isArchived: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Project URL type
+export interface ProjectUrl {
+  id: string;
+  title: string;
+  url: string;
 }
 
 export interface ProjectMember {
@@ -98,8 +107,18 @@ export interface Comment {
   content: string;
   authorId: string;
   mentions: string[];
+  attachments?: CommentAttachment[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Comment attachment type
+export interface CommentAttachment {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
 }
 
 // Attachment types
@@ -131,7 +150,11 @@ export interface Notification {
   title: string;
   message: string;
   projectId: string;
+  projectName?: string;
   taskId: string | null;
+  taskName?: string;
+  senderId?: string;
+  senderName?: string;
   isRead: boolean;
   createdAt: Date;
   data: Record<string, unknown>;
@@ -142,7 +165,16 @@ export type NotificationType =
   | 'task_updated'
   | 'comment_added'
   | 'mentioned'
-  | 'due_reminder';
+  | 'due_reminder'
+  | 'task_bell'; // Bell notification from task
+
+// User memo type
+export interface UserMemo {
+  id: string;
+  userId: string;
+  content: string;
+  updatedAt: Date;
+}
 
 // Label color presets
 export const LABEL_COLORS = [
