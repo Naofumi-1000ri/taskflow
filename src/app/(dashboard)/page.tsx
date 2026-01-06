@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProjects } from '@/hooks/useProjects';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarDays, FolderKanban, Plus, WifiOff, RefreshCw } from 'lucide-react';
+import { FolderKanban, Plus, WifiOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useUIStore } from '@/stores/uiStore';
 import { PersonalMemo } from '@/components/dashboard/PersonalMemo';
@@ -100,28 +100,8 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* My Tasks - Placeholder until cross-project task query is implemented */}
-        <Card>
-          <CardHeader>
-            <CardTitle>マイタスク</CardTitle>
-            <CardDescription>あなたが担当しているタスク</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <CalendarDays className="mb-4 h-12 w-12 text-muted-foreground/50" />
-              <p className="text-muted-foreground">
-                プロジェクトを選択してタスクを確認してください
-              </p>
-              {projects.length > 0 && (
-                <Link href={`/projects/${projects[0].id}/board`}>
-                  <Button variant="link" className="mt-2">
-                    {projects[0].name}を開く
-                  </Button>
-                </Link>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Personal Memo */}
+        <PersonalMemo />
 
         {/* Projects */}
         <Card>
@@ -184,11 +164,6 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-      </div>
-
-      {/* Personal Memo */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <PersonalMemo />
       </div>
     </div>
   );
