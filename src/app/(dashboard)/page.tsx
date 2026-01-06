@@ -1,6 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { useProjects } from '@/hooks/useProjects';
@@ -18,29 +17,12 @@ export default function DashboardPage() {
 
   const isOfflineError = error?.message?.includes('offline');
 
-  // Calculate stats from real data
-  const stats = useMemo(() => {
-    return [
-      {
-        name: 'プロジェクト数',
-        value: projects.length,
-        icon: FolderKanban,
-        color: 'text-blue-600',
-      },
-    ];
-  }, [projects]);
-
   if (isLoading) {
     return (
       <div className="space-y-6">
         <div>
           <Skeleton className="h-8 w-64" />
           <Skeleton className="mt-2 h-4 w-32" />
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
         </div>
         <div className="grid gap-6 lg:grid-cols-2">
           <Skeleton className="h-64" />
@@ -82,23 +64,6 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {stats.map((stat) => (
-          <Card key={stat.name}>
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className={`rounded-full bg-gray-100 p-3 ${stat.color}`}>
-                <stat.icon className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stat.value}</p>
-                <p className="text-sm text-muted-foreground">{stat.name}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Personal Memo */}
         <PersonalMemo />
@@ -107,7 +72,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>プロジェクト</CardTitle>
+              <CardTitle>プロジェクト（{projects.length}）</CardTitle>
               <CardDescription>参加中のプロジェクト</CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={() => openProjectModal()}>
