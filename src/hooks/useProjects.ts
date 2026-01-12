@@ -165,11 +165,22 @@ export function useProject(projectId: string | null) {
 
   // Update project
   const update = useCallback(
-    async (data: Partial<{ name: string; description: string; color: string; icon: string; iconUrl?: string; urls?: ProjectUrl[] }>) => {
+    async (data: Partial<{ name: string; description: string; color: string; icon: string; iconUrl?: string | null; urls?: ProjectUrl[] }>) => {
       if (!projectId) return;
       try {
         await updateProject(projectId, data);
-        setProject((prev) => (prev ? { ...prev, ...data } : null));
+        // For local state, convert null/empty to undefined for Project type compatibility
+        setProject((prev) => {
+          if (!prev) return null;
+          const updated = { ...prev };
+          if ('name' in data && data.name !== undefined) updated.name = data.name;
+          if ('description' in data && data.description !== undefined) updated.description = data.description;
+          if ('color' in data && data.color !== undefined) updated.color = data.color;
+          if ('icon' in data && data.icon !== undefined) updated.icon = data.icon;
+          if ('iconUrl' in data) updated.iconUrl = data.iconUrl === null || data.iconUrl === '' ? undefined : data.iconUrl;
+          if ('urls' in data && data.urls !== undefined) updated.urls = data.urls;
+          return updated;
+        });
       } catch (err) {
         setError(err as Error);
         throw err;

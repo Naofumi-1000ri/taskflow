@@ -5,7 +5,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { Calendar, Bell } from 'lucide-react';
+import { Calendar, Bell, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -134,8 +134,7 @@ export function TaskCard({ projectId, task, labels, tags, onClick, isDragging }:
       data-testid="task-card"
       className={cn(
         'group cursor-pointer rounded-lg border bg-white shadow-sm transition-shadow hover:shadow-md',
-        (isDragging || isSortableDragging) && 'opacity-50 shadow-lg',
-        task.isCompleted && 'opacity-60'
+        (isDragging || isSortableDragging) && 'opacity-50 shadow-lg'
       )}
     >
       {/* Image Attachments - displayed at top like Jooto */}
@@ -195,12 +194,7 @@ export function TaskCard({ projectId, task, labels, tags, onClick, isDragging }:
 
         {/* Title Row with Bell */}
         <div className="flex items-start justify-between gap-2">
-          <p
-            className={cn(
-              'flex-1 text-sm font-medium',
-              task.isCompleted && 'line-through text-muted-foreground'
-            )}
-          >
+          <p className="flex-1 text-sm font-medium">
             {task.title}
           </p>
           <Popover open={isBellOpen} onOpenChange={setIsBellOpen}>
@@ -272,21 +266,29 @@ export function TaskCard({ projectId, task, labels, tags, onClick, isDragging }:
         )}
 
         {/* Metadata Row */}
-        {(task.startDate || task.dueDate || task.priority) && (
+        {(task.startDate || task.dueDate || task.priority || task.completedAt) && (
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            {/* Date Range */}
-            {(task.startDate || task.dueDate) && (
+            {/* Completion Date - shown when completed */}
+            {task.isCompleted && task.completedAt && (
+              <div className="flex items-center gap-1 text-green-600">
+                <CheckCircle2 className="h-3 w-3" />
+                <span>完了: {format(task.completedAt, 'M/d', { locale: ja })}</span>
+              </div>
+            )}
+
+            {/* Date Range - not shown as overdue if completed */}
+            {!task.isCompleted && (task.startDate || task.dueDate) && (
               <div
                 className={cn(
                   'flex items-center gap-1',
-                  isOverdue && !task.isCompleted && 'text-red-500'
+                  isOverdue && 'text-red-500'
                 )}
               >
                 <Calendar className="h-3 w-3" />
                 <span>
-                  {task.startDate && format(task.startDate, 'yyyy/MM/dd', { locale: ja })}
+                  {task.startDate && format(task.startDate, 'M/d', { locale: ja })}
                   {task.startDate && task.dueDate && ' - '}
-                  {task.dueDate && format(task.dueDate, 'yyyy/MM/dd', { locale: ja })}
+                  {task.dueDate && format(task.dueDate, 'M/d', { locale: ja })}
                 </span>
               </div>
             )}

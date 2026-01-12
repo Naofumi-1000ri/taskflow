@@ -46,6 +46,8 @@ import {
   Paperclip,
   FileIcon,
   Image as ImageIcon,
+  CheckCircle2,
+  Circle,
 } from 'lucide-react';
 import { formatFileSize, getFileIcon } from '@/lib/firebase/storage';
 import { cn, linkifyText } from '@/lib/utils';
@@ -98,6 +100,7 @@ export function TaskDetailModal({
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [completedAt, setCompletedAt] = useState<Date | undefined>();
   const [commentText, setCommentText] = useState('');
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -138,6 +141,7 @@ export function TaskDetailModal({
         setStartDate(task.startDate || undefined);
         setSelectedLabelIds(task.labelIds);
         setIsCompleted(task.isCompleted);
+        setCompletedAt(task.completedAt || undefined);
         setCommentText(''); // Reset comment when task changes
         setPendingFiles([]);
       });
@@ -163,6 +167,19 @@ export function TaskDetailModal({
       startDate: startDate || null,
       labelIds: selectedLabelIds,
       isCompleted,
+      completedAt: completedAt || null,
+    });
+  };
+
+  // Toggle completion with automatic completedAt handling
+  const handleToggleComplete = () => {
+    const newIsCompleted = !isCompleted;
+    const newCompletedAt = newIsCompleted ? new Date() : undefined;
+    setIsCompleted(newIsCompleted);
+    setCompletedAt(newCompletedAt);
+    onUpdate({
+      isCompleted: newIsCompleted,
+      completedAt: newCompletedAt || null,
     });
   };
 
@@ -358,6 +375,56 @@ export function TaskDetailModal({
 
               {/* Metadata Row */}
               <div className="space-y-3">
+                {/* Completion Status */}
+                <div className="flex items-center gap-3 py-2 text-sm">
+                  <button
+                    onClick={handleToggleComplete}
+                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+                  >
+                    {isCompleted ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    ) : (
+                      <Circle className="h-5 w-5" />
+                    )}
+                  </button>
+                  <div className="flex flex-1 items-center gap-2">
+                    <button
+                      onClick={handleToggleComplete}
+                      className={cn(
+                        'hover:text-foreground',
+                        isCompleted ? 'font-medium text-green-600' : 'text-muted-foreground'
+                      )}
+                    >
+                      {isCompleted ? '完了' : '未完了'}
+                    </button>
+                    {isCompleted && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="flex items-center gap-1 rounded border px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
+                            <CalendarIcon className="h-3 w-3" />
+                            {completedAt ? format(completedAt, 'M/d', { locale: ja }) : format(new Date(), 'M/d', { locale: ja })}
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-4" align="start">
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium">完了日</p>
+                            <Calendar
+                              mode="single"
+                              selected={completedAt || new Date()}
+                              onSelect={(date) => {
+                                if (date) {
+                                  setCompletedAt(date);
+                                  onUpdate({ completedAt: date });
+                                }
+                              }}
+                            />
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
+                </div>
+
                 {/* Start Date */}
                 <div className="flex items-center gap-3 py-2 text-sm">
                   <CalendarIcon className="h-5 w-5 text-muted-foreground" />

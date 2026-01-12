@@ -93,6 +93,8 @@ export function useBoard(projectId: string | null) {
         name,
         color,
         order: maxOrder + 1,
+        autoCompleteOnEnter: false,
+        autoUncompleteOnExit: false,
       });
     },
     [projectId, state.lists]
@@ -100,7 +102,7 @@ export function useBoard(projectId: string | null) {
 
   // Update list
   const editList = useCallback(
-    async (listId: string, data: { name?: string; color?: string }) => {
+    async (listId: string, data: { name?: string; color?: string; autoCompleteOnEnter?: boolean; autoUncompleteOnExit?: boolean }) => {
       if (!projectId) return;
       await updateList(projectId, listId, data);
     },
@@ -114,19 +116,32 @@ export function useBoard(projectId: string | null) {
 
       // Get tasks in the list to be deleted
       const tasksToMove = state.tasks.filter((t) => t.listId === listId);
+      const oldList = state.lists.find((l) => l.id === listId);
+      const targetList = targetListId ? state.lists.find((l) => l.id === targetListId) : null;
 
       if (tasksToMove.length > 0 && targetListId) {
         // Get max order in target list
         const targetTasks = state.tasks.filter((t) => t.listId === targetListId);
         let maxOrder = Math.max(...targetTasks.map((t) => t.order), -1);
 
-        // Move all tasks to target list
+        // Move all tasks to target list with auto-complete logic
         const moveUpdates = tasksToMove.map((task) => {
           maxOrder += 1;
-          return updateTask(projectId, task.id, {
+          const updateData: Partial<Task> = {
             listId: targetListId,
             order: maxOrder,
-          });
+          };
+
+          // Apply auto-complete logic
+          if (targetList?.autoCompleteOnEnter && !task.isCompleted) {
+            updateData.isCompleted = true;
+            updateData.completedAt = new Date();
+          } else if (oldList?.autoUncompleteOnExit && task.isCompleted) {
+            updateData.isCompleted = false;
+            updateData.completedAt = null;
+          }
+
+          return updateTask(projectId, task.id, updateData);
         });
         await Promise.all(moveUpdates);
       }
@@ -134,7 +149,7 @@ export function useBoard(projectId: string | null) {
       // Delete the list
       await deleteList(projectId, listId);
     },
-    [projectId, state.tasks]
+    [projectId, state.tasks, state.lists]
   );
 
   // Reorder lists
@@ -155,6 +170,11 @@ export function useBoard(projectId: string | null) {
       if (!projectId) return;
       const tasksInList = state.tasks.filter((t) => t.listId === listId);
       const maxOrder = Math.max(...tasksInList.map((t) => t.order), -1);
+
+      // Check if the target list has auto-complete enabled
+      const targetList = state.lists.find((l) => l.id === listId);
+      const shouldAutoComplete = targetList?.autoCompleteOnEnter ?? false;
+
       await createTask(projectId, {
         listId,
         title,
@@ -166,11 +186,13 @@ export function useBoard(projectId: string | null) {
         priority: null,
         startDate: null,
         dueDate: null,
-        isCompleted: false,
+        isCompleted: shouldAutoComplete,
+        completedAt: shouldAutoComplete ? new Date() : null,
+        isAbandoned: false,
         createdBy,
       });
     },
-    [projectId, state.tasks]
+    [projectId, state.tasks, state.lists]
   );
 
   // Update task
@@ -198,12 +220,35 @@ export function useBoard(projectId: string | null) {
   const moveTask = useCallback(
     async (taskId: string, newListId: string, newOrder: number) => {
       if (!projectId) return;
-      await updateTask(projectId, taskId, {
+
+      // Find the task and lists
+      const task = state.tasks.find((t) => t.id === taskId);
+      const oldList = task ? state.lists.find((l) => l.id === task.listId) : null;
+      const newList = state.lists.find((l) => l.id === newListId);
+
+      // Prepare update data
+      const updateData: Partial<Task> = {
         listId: newListId,
         order: newOrder,
-      });
+      };
+
+      // Only apply auto-complete logic when moving to a different list
+      if (task && task.listId !== newListId) {
+        // Check if new list auto-completes tasks
+        if (newList?.autoCompleteOnEnter && !task.isCompleted) {
+          updateData.isCompleted = true;
+          updateData.completedAt = new Date();
+        }
+        // Check if old list auto-uncompletes tasks on exit
+        else if (oldList?.autoUncompleteOnExit && task.isCompleted) {
+          updateData.isCompleted = false;
+          updateData.completedAt = null;
+        }
+      }
+
+      await updateTask(projectId, taskId, updateData);
     },
-    [projectId]
+    [projectId, state.tasks, state.lists]
   );
 
   // Reorder tasks within a list

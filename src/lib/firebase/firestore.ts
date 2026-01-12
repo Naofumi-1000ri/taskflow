@@ -15,6 +15,7 @@ import {
   writeBatch,
   Timestamp,
   documentId,
+  deleteField,
   type DocumentData,
   type QueryConstraint,
 } from 'firebase/firestore';
@@ -45,6 +46,14 @@ function convertDoc<T>(doc: DocumentData, id: string): T {
   return {
     ...data,
     id,
+    // Convert empty string iconUrl to undefined
+    iconUrl: data.iconUrl || undefined,
+    // Default values for List fields (for backward compatibility)
+    autoCompleteOnEnter: data.autoCompleteOnEnter ?? false,
+    autoUncompleteOnExit: data.autoUncompleteOnExit ?? false,
+    // Default values for Task fields (for backward compatibility)
+    completedAt: data.completedAt ? toDate(data.completedAt) : null,
+    isAbandoned: data.isAbandoned ?? false,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   } as T;
@@ -117,13 +126,29 @@ export async function getProject(projectId: string): Promise<Project | null> {
   return convertDoc<Project>(projectDoc.data(), projectDoc.id);
 }
 
+// Type for update data where optional fields can be null (to clear them)
+type ProjectUpdateData = Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'iconUrl' | 'urls'>> & {
+  iconUrl?: string | null;
+  urls?: Project['urls'] | null;
+};
+
 export async function updateProject(
   projectId: string,
-  data: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>
+  data: ProjectUpdateData
 ): Promise<void> {
   const db = getFirebaseDb();
+  // Convert null values to empty string for iconUrl (more reliable than deleteField)
+  const processedData: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value === null) {
+      // Use empty string instead of deleteField for better compatibility
+      processedData[key] = '';
+    } else if (value !== undefined) {
+      processedData[key] = value;
+    }
+  }
   await updateDoc(doc(db, 'projects', projectId), {
-    ...data,
+    ...processedData,
     updatedAt: serverTimestamp(),
   });
 }

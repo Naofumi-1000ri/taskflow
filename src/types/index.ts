@@ -47,6 +47,8 @@ export interface List {
   name: string;
   color: string;
   order: number;
+  autoCompleteOnEnter: boolean; // Mark tasks as complete when entering this list
+  autoUncompleteOnExit: boolean; // Remove completion when tasks leave this list
   createdAt: Date;
   updatedAt: Date;
 }
@@ -66,6 +68,8 @@ export interface Task {
   startDate: Date | null;
   dueDate: Date | null;
   isCompleted: boolean;
+  completedAt: Date | null; // When the task was completed
+  isAbandoned: boolean; // Task was abandoned/cancelled
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;

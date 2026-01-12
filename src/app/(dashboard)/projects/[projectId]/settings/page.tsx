@@ -143,7 +143,7 @@ export default function ProjectSettingsPage() {
     try {
       await deleteProjectIcon(projectId, iconUrl);
       setIconUrl(undefined);
-      await update({ iconUrl: undefined });
+      await update({ iconUrl: null });
     } catch (error) {
       console.error('Failed to remove icon:', error);
     }
