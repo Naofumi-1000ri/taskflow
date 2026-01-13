@@ -49,10 +49,12 @@ import {
   CheckCircle2,
   Circle,
   Pencil,
+  Bell,
 } from 'lucide-react';
 import { formatFileSize, getFileIcon } from '@/lib/firebase/storage';
 import { cn, linkifyText } from '@/lib/utils';
 import { useTaskDetails } from '@/hooks/useTaskDetails';
+import { useNotifications } from '@/hooks/useNotifications';
 import { useAuthStore } from '@/stores/authStore';
 import { getProject, getProjectTags, createTag, getUsersByIds } from '@/lib/firebase/firestore';
 import { AssigneeSelector } from './AssigneeSelector';
@@ -82,6 +84,7 @@ export function TaskDetailModal({
   onDelete,
 }: TaskDetailModalProps) {
   const { user } = useAuthStore();
+  const { sendBellNotification } = useNotifications();
   const {
     checklists,
     comments,
@@ -117,13 +120,18 @@ export function TaskDetailModal({
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState<string>(TAG_COLORS[0].value);
+  const [projectName, setProjectName] = useState('');
+  const [isBellOpen, setIsBellOpen] = useState(false);
+  const [bellMessage, setBellMessage] = useState('');
+  const [isSendingBell, setIsSendingBell] = useState(false);
 
-  // Fetch project members
+  // Fetch project members and name
   useEffect(() => {
     if (projectId) {
       getProject(projectId).then((project) => {
         if (project) {
           setProjectMemberIds(project.memberIds);
+          setProjectName(project.name);
         }
       });
     }
@@ -190,6 +198,27 @@ export function TaskDetailModal({
       isCompleted,
       completedAt: completedAt || null,
     });
+  };
+
+  const handleSendBellNotification = async () => {
+    if (!projectId || !task?.id) return;
+
+    setIsSendingBell(true);
+    try {
+      await sendBellNotification(
+        projectId,
+        projectName,
+        task.id,
+        task.title,
+        bellMessage
+      );
+      setBellMessage('');
+      setIsBellOpen(false);
+    } catch (error) {
+      console.error('Failed to send notification:', error);
+    } finally {
+      setIsSendingBell(false);
+    }
   };
 
   // Toggle completion with automatic completedAt handling
@@ -316,9 +345,36 @@ export function TaskDetailModal({
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Star className="h-4 w-4" />
-                </Button>
+                <Popover open={isBellOpen} onOpenChange={setIsBellOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Bell className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 bg-background border shadow-lg" align="end">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">メンバーに通知</p>
+                      <Input
+                        value={bellMessage}
+                        onChange={(e) => setBellMessage(e.target.value)}
+                        placeholder="メッセージ（任意）"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                            handleSendBellNotification();
+                          }
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        onClick={handleSendBellNotification}
+                        disabled={isSendingBell}
+                      >
+                        {isSendingBell ? '送信中...' : '通知を送信'}
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             <DialogTitle className="mt-2">

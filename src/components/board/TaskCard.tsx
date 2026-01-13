@@ -210,7 +210,7 @@ export function TaskCard({ projectId, task, labels, tags, onClick, isDragging }:
               </button>
             </PopoverTrigger>
             <PopoverContent
-              className="w-64"
+              className="w-64 bg-background border shadow-lg z-50"
               align="end"
               onClick={(e) => e.stopPropagation()}
             >
