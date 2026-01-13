@@ -1012,14 +1012,22 @@ export function subscribeToUserNotifications(
     orderBy('createdAt', 'desc')
   );
 
-  return onSnapshot(q, (snapshot) => {
-    const notifications = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: toDate(doc.data().createdAt),
-    })) as Notification[];
-    callback(notifications);
-  });
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const notifications = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: toDate(doc.data().createdAt),
+      })) as Notification[];
+      callback(notifications);
+    },
+    (error) => {
+      console.error('Notification subscription error:', error);
+      // Return empty array on error to stop loading
+      callback([]);
+    }
+  );
 }
 
 export async function markNotificationAsRead(notificationId: string): Promise<void> {
