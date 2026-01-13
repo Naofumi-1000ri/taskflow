@@ -202,7 +202,7 @@ export function useTaskDetails(projectId: string | null, taskId: string | null) 
         content,
         authorId,
         mentions,
-        attachments: commentAttachments.length > 0 ? commentAttachments : undefined,
+        attachments: commentAttachments,
       });
     },
     [projectId, taskId]

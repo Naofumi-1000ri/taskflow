@@ -594,7 +594,10 @@ export async function createComment(
   const commentRef = await addDoc(
     collection(db, 'projects', projectId, 'tasks', taskId, 'comments'),
     {
-      ...data,
+      content: data.content,
+      authorId: data.authorId,
+      mentions: data.mentions || [],
+      attachments: data.attachments || [],
       taskId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
