@@ -95,7 +95,8 @@ export function TaskCard({ projectId, task, labels, tags, onClick, isDragging }:
         projectName,
         task.id,
         task.title,
-        bellMessage
+        bellMessage,
+        task.assigneeIds
       );
       setBellMessage('');
       setIsBellOpen(false);

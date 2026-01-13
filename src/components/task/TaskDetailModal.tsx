@@ -210,7 +210,8 @@ export function TaskDetailModal({
         projectName,
         task.id,
         task.title,
-        bellMessage
+        bellMessage,
+        task.assigneeIds
       );
       setBellMessage('');
       setIsBellOpen(false);

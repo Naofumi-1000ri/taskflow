@@ -7,7 +7,6 @@ import {
   markAllNotificationsAsRead,
   deleteNotification,
   createNotification,
-  getProjectMembers,
 } from '@/lib/firebase/firestore';
 import { useAuthStore } from '@/stores/authStore';
 import type { Notification } from '@/types';
@@ -56,26 +55,27 @@ export function useNotifications() {
     await deleteNotification(notificationId);
   }, []);
 
-  // Send bell notification to project members
+  // Send bell notification to task assignees
   const sendBellNotification = useCallback(
     async (
       projectId: string,
       projectName: string,
       taskId: string,
       taskName: string,
-      message: string
+      message: string,
+      assigneeIds: string[]
     ) => {
       if (!user) return;
 
-      // Get all project members
-      const members = await getProjectMembers(projectId);
-      console.log('[Notifications] Sending to members:', members.map(m => m.userId));
+      // Include sender in notification recipients for confirmation
+      const recipientIds = [...new Set([...assigneeIds, user.id])];
+      console.log('[Notifications] Sending to assignees:', recipientIds);
       console.log('[Notifications] Current user id:', user.id);
 
-      // Create notification for all members (including sender for confirmation)
-      const promises = members.map((member) =>
+      // Create notification for all assignees (including sender for confirmation)
+      const promises = recipientIds.map((userId) =>
           createNotification({
-            userId: member.userId,
+            userId,
             type: 'task_bell',
             title: `${user.displayName || 'ユーザー'}からのメッセージ`,
             message: message || `${taskName}へのアサイン`,
