@@ -1005,6 +1005,7 @@ export function subscribeToUserNotifications(
   userId: string,
   callback: (notifications: Notification[]) => void
 ): () => void {
+  console.log('[Firestore] subscribeToUserNotifications for userId:', userId);
   const db = getFirebaseDb();
   const q = query(
     collection(db, 'notifications'),
@@ -1015,6 +1016,7 @@ export function subscribeToUserNotifications(
   return onSnapshot(
     q,
     (snapshot) => {
+      console.log('[Firestore] Notification snapshot received, count:', snapshot.docs.length);
       const notifications = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -1023,7 +1025,8 @@ export function subscribeToUserNotifications(
       callback(notifications);
     },
     (error) => {
-      console.error('Notification subscription error:', error);
+      console.error('[Firestore] Notification subscription error:', error);
+      console.error('[Firestore] Error message:', error.message);
       // Return empty array on error to stop loading
       callback([]);
     }

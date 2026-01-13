@@ -20,12 +20,15 @@ export function useNotifications() {
   // Subscribe to notifications
   useEffect(() => {
     if (!user?.id) {
+      console.log('[Notifications] No user id, skipping subscription');
       setNotifications([]);
       setIsLoading(false);
       return;
     }
 
+    console.log('[Notifications] Subscribing for user:', user.id);
     const unsubscribe = subscribeToUserNotifications(user.id, (notifs) => {
+      console.log('[Notifications] Received notifications:', notifs.length, notifs);
       setNotifications(notifs);
       setIsLoading(false);
     });
@@ -66,6 +69,8 @@ export function useNotifications() {
 
       // Get all project members
       const members = await getProjectMembers(projectId);
+      console.log('[Notifications] Sending to members:', members.map(m => m.userId));
+      console.log('[Notifications] Current user id:', user.id);
 
       // Create notification for all members (including sender for confirmation)
       const promises = members.map((member) =>
