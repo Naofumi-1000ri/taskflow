@@ -10,6 +10,7 @@ import {
   getTaskComments,
   createComment,
   deleteComment,
+  updateComment,
   subscribeToTaskComments,
   getTaskAttachments,
   createAttachment,
@@ -218,6 +219,15 @@ export function useTaskDetails(projectId: string | null, taskId: string | null) 
     [projectId, taskId]
   );
 
+  // Edit comment
+  const editComment = useCallback(
+    async (commentId: string, content: string) => {
+      if (!projectId || !taskId) return;
+      await updateComment(projectId, taskId, commentId, content);
+    },
+    [projectId, taskId]
+  );
+
   // Get all comment attachments (for displaying at task top)
   const getAllCommentAttachments = useCallback(() => {
     const allAttachments: { commentId: string; attachment: CommentAttachment; createdAt: Date }[] = [];
@@ -275,6 +285,7 @@ export function useTaskDetails(projectId: string | null, taskId: string | null) 
     removeChecklistItem,
     addComment,
     removeComment,
+    editComment,
     getAllCommentAttachments,
     uploadAttachment,
     removeAttachment,

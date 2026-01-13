@@ -648,6 +648,19 @@ export async function deleteComment(
   await deleteDoc(doc(db, 'projects', projectId, 'tasks', taskId, 'comments', commentId));
 }
 
+export async function updateComment(
+  projectId: string,
+  taskId: string,
+  commentId: string,
+  content: string
+): Promise<void> {
+  const db = getFirebaseDb();
+  await updateDoc(doc(db, 'projects', projectId, 'tasks', taskId, 'comments', commentId), {
+    content,
+    updatedAt: serverTimestamp(),
+  });
+}
+
 // ==================== Checklists ====================
 
 export async function createChecklist(

@@ -48,6 +48,7 @@ import {
   Image as ImageIcon,
   CheckCircle2,
   Circle,
+  Pencil,
 } from 'lucide-react';
 import { formatFileSize, getFileIcon } from '@/lib/firebase/storage';
 import { cn, linkifyText } from '@/lib/utils';
@@ -55,6 +56,7 @@ import { useTaskDetails } from '@/hooks/useTaskDetails';
 import { useAuthStore } from '@/stores/authStore';
 import { getProject, getProjectTags, createTag, getUsersByIds } from '@/lib/firebase/firestore';
 import { AssigneeSelector } from './AssigneeSelector';
+import { AttachmentPreview, AttachmentPreviewCompact } from './AttachmentPreview';
 import type { Task, Label as LabelType, Tag as TagType, List, Priority, Checklist } from '@/types';
 import { TAG_COLORS } from '@/types';
 
@@ -90,6 +92,7 @@ export function TaskDetailModal({
     removeChecklistItem,
     addComment,
     removeComment,
+    editComment,
     getAllCommentAttachments,
   } = useTaskDetails(projectId, task?.id || null);
 
@@ -109,6 +112,8 @@ export function TaskDetailModal({
   const [projectMemberIds, setProjectMemberIds] = useState<string[]>([]);
   const [projectTags, setProjectTags] = useState<TagType[]>([]);
   const [commentAuthors, setCommentAuthors] = useState<Record<string, { displayName: string; photoURL?: string }>>({});
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState<string>(TAG_COLORS[0].value);
@@ -138,7 +143,7 @@ export function TaskDetailModal({
       getUsersByIds(authorIds).then((users) => {
         const authorsMap: Record<string, { displayName: string; photoURL?: string }> = {};
         users.forEach((u) => {
-          authorsMap[u.id] = { displayName: u.displayName, photoURL: u.photoURL };
+          authorsMap[u.id] = { displayName: u.displayName, photoURL: u.photoURL || undefined };
         });
         setCommentAuthors(authorsMap);
       });
@@ -347,29 +352,14 @@ export function TaskDetailModal({
                   </div>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {commentAttachments.map(({ attachment }) => (
-                      <a
+                      <AttachmentPreview
                         key={attachment.id}
-                        href={attachment.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group flex items-center gap-2 rounded-lg border p-2 hover:bg-muted"
-                      >
-                        {attachment.type.startsWith('image/') ? (
-                          <img
-                            src={attachment.url}
-                            alt={attachment.name}
-                            className="h-10 w-10 rounded object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-10 w-10 items-center justify-center rounded bg-muted">
-                            <FileIcon className="h-5 w-5 text-muted-foreground" />
-                          </div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-medium">{attachment.name}</p>
-                          <p className="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</p>
-                        </div>
-                      </a>
+                        id={attachment.id}
+                        name={attachment.name}
+                        url={attachment.url}
+                        type={attachment.type}
+                        size={attachment.size}
+                      />
                     ))}
                   </div>
                 </div>
@@ -740,6 +730,8 @@ export function TaskDetailModal({
                       const author = commentAuthors[comment.authorId];
                       const authorName = author?.displayName || 'Unknown';
                       const authorInitials = authorName.slice(0, 2).toUpperCase();
+                      const isEditing = editingCommentId === comment.id;
+                      const isEdited = comment.updatedAt && comment.updatedAt.getTime() !== comment.createdAt.getTime();
                       return (
                         <div key={comment.id} className="group flex gap-3">
                           <div className="h-8 w-8 flex-shrink-0 rounded-full bg-muted flex items-center justify-center text-xs font-medium overflow-hidden">
@@ -754,44 +746,88 @@ export function TaskDetailModal({
                               <span className="text-sm font-medium">{authorName}</span>
                               <span className="text-xs text-muted-foreground">
                                 {format(comment.createdAt, 'M/d HH:mm', { locale: ja })}
+                                {isEdited && ' (編集済み)'}
                               </span>
-                              <button
-                                onClick={() => {
-                                  if (confirm('このコメントを削除しますか？')) {
-                                    removeComment(comment.id);
-                                  }
-                                }}
-                                className="ml-auto opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                            <div className="rounded-lg bg-muted p-3">
-                              {comment.content && (
-                                <p className="break-all whitespace-pre-wrap text-sm">{linkifyText(comment.content)}</p>
-                              )}
-                              {/* Comment Attachments */}
-                              {comment.attachments && comment.attachments.length > 0 && (
-                                <div className={cn("flex flex-wrap gap-2", comment.content && "mt-2")}>
-                                  {comment.attachments.map((att) => (
-                                    <a
-                                      key={att.id}
-                                      href={att.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted"
-                                    >
-                                      {att.type.startsWith('image/') ? (
-                                        <ImageIcon className="h-3 w-3" />
-                                      ) : (
-                                        <FileIcon className="h-3 w-3" />
-                                      )}
-                                      <span className="max-w-[100px] truncate">{att.name}</span>
-                                    </a>
-                                  ))}
+                              {!isEditing && (
+                                <div className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={() => {
+                                      setEditingCommentId(comment.id);
+                                      setEditingCommentText(comment.content);
+                                    }}
+                                    className="text-muted-foreground hover:text-foreground"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (confirm('このコメントを削除しますか？')) {
+                                        removeComment(comment.id);
+                                      }
+                                    }}
+                                    className="text-muted-foreground hover:text-destructive"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
                                 </div>
                               )}
                             </div>
+                            {isEditing ? (
+                              <div className="rounded-lg border p-2">
+                                <Textarea
+                                  value={editingCommentText}
+                                  onChange={(e) => setEditingCommentText(e.target.value)}
+                                  rows={3}
+                                  className="resize-none break-all border-none p-0 shadow-none focus-visible:ring-0"
+                                  autoFocus
+                                />
+                                <div className="mt-2 flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={async () => {
+                                      if (editingCommentText.trim()) {
+                                        await editComment(comment.id, editingCommentText.trim());
+                                        setEditingCommentId(null);
+                                        setEditingCommentText('');
+                                      }
+                                    }}
+                                  >
+                                    保存
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setEditingCommentId(null);
+                                      setEditingCommentText('');
+                                    }}
+                                  >
+                                    キャンセル
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="rounded-lg bg-muted p-3">
+                                {comment.content && (
+                                  <p className="break-all whitespace-pre-wrap text-sm">{linkifyText(comment.content)}</p>
+                                )}
+                                {/* Comment Attachments */}
+                                {comment.attachments && comment.attachments.length > 0 && (
+                                  <div className={cn("flex flex-wrap gap-2", comment.content && "mt-2")}>
+                                    {comment.attachments.map((att) => (
+                                      <AttachmentPreviewCompact
+                                        key={att.id}
+                                        id={att.id}
+                                        name={att.name}
+                                        url={att.url}
+                                        type={att.type}
+                                        size={att.size}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
