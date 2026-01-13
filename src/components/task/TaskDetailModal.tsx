@@ -53,7 +53,7 @@ import { formatFileSize, getFileIcon } from '@/lib/firebase/storage';
 import { cn, linkifyText } from '@/lib/utils';
 import { useTaskDetails } from '@/hooks/useTaskDetails';
 import { useAuthStore } from '@/stores/authStore';
-import { getProject, getProjectTags, createTag } from '@/lib/firebase/firestore';
+import { getProject, getProjectTags, createTag, getUsersByIds } from '@/lib/firebase/firestore';
 import { AssigneeSelector } from './AssigneeSelector';
 import type { Task, Label as LabelType, Tag as TagType, List, Priority, Checklist } from '@/types';
 import { TAG_COLORS } from '@/types';
@@ -89,6 +89,7 @@ export function TaskDetailModal({
     toggleChecklistItem,
     removeChecklistItem,
     addComment,
+    removeComment,
     getAllCommentAttachments,
   } = useTaskDetails(projectId, task?.id || null);
 
@@ -107,6 +108,7 @@ export function TaskDetailModal({
   const [expandedChecklists, setExpandedChecklists] = useState<Set<string>>(new Set());
   const [projectMemberIds, setProjectMemberIds] = useState<string[]>([]);
   const [projectTags, setProjectTags] = useState<TagType[]>([]);
+  const [commentAuthors, setCommentAuthors] = useState<Record<string, { displayName: string; photoURL?: string }>>({});
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState<string>(TAG_COLORS[0].value);
@@ -128,6 +130,20 @@ export function TaskDetailModal({
       getProjectTags(projectId).then(setProjectTags);
     }
   }, [projectId]);
+
+  // Fetch comment authors
+  useEffect(() => {
+    const authorIds = [...new Set(comments.map(c => c.authorId))];
+    if (authorIds.length > 0) {
+      getUsersByIds(authorIds).then((users) => {
+        const authorsMap: Record<string, { displayName: string; photoURL?: string }> = {};
+        users.forEach((u) => {
+          authorsMap[u.id] = { displayName: u.displayName, photoURL: u.photoURL };
+        });
+        setCommentAuthors(authorsMap);
+      });
+    }
+  }, [comments]);
 
   // Initialize form when task changes
   useEffect(() => {
@@ -720,44 +736,66 @@ export function TaskDetailModal({
                 {/* Comment List */}
                 {comments.length > 0 && (
                   <div className="mb-4 space-y-3">
-                    {comments.map((comment) => (
-                      <div key={comment.id} className="flex gap-3">
-                        <div className="h-8 w-8 flex-shrink-0 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
-                          {comment.authorId.slice(0, 2).toUpperCase()}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="rounded-lg bg-muted p-3">
-                            {comment.content && (
-                              <p className="break-all whitespace-pre-wrap text-sm">{linkifyText(comment.content)}</p>
-                            )}
-                            {/* Comment Attachments */}
-                            {comment.attachments && comment.attachments.length > 0 && (
-                              <div className={cn("flex flex-wrap gap-2", comment.content && "mt-2")}>
-                                {comment.attachments.map((att) => (
-                                  <a
-                                    key={att.id}
-                                    href={att.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted"
-                                  >
-                                    {att.type.startsWith('image/') ? (
-                                      <ImageIcon className="h-3 w-3" />
-                                    ) : (
-                                      <FileIcon className="h-3 w-3" />
-                                    )}
-                                    <span className="max-w-[100px] truncate">{att.name}</span>
-                                  </a>
-                                ))}
-                              </div>
+                    {comments.map((comment) => {
+                      const author = commentAuthors[comment.authorId];
+                      const authorName = author?.displayName || 'Unknown';
+                      const authorInitials = authorName.slice(0, 2).toUpperCase();
+                      return (
+                        <div key={comment.id} className="group flex gap-3">
+                          <div className="h-8 w-8 flex-shrink-0 rounded-full bg-muted flex items-center justify-center text-xs font-medium overflow-hidden">
+                            {author?.photoURL ? (
+                              <img src={author.photoURL} alt={authorName} className="h-full w-full object-cover" />
+                            ) : (
+                              authorInitials
                             )}
                           </div>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {format(comment.createdAt, 'M/d HH:mm', { locale: ja })}
-                          </p>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-medium">{authorName}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {format(comment.createdAt, 'M/d HH:mm', { locale: ja })}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  if (confirm('このコメントを削除しますか？')) {
+                                    removeComment(comment.id);
+                                  }
+                                }}
+                                className="ml-auto opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                            <div className="rounded-lg bg-muted p-3">
+                              {comment.content && (
+                                <p className="break-all whitespace-pre-wrap text-sm">{linkifyText(comment.content)}</p>
+                              )}
+                              {/* Comment Attachments */}
+                              {comment.attachments && comment.attachments.length > 0 && (
+                                <div className={cn("flex flex-wrap gap-2", comment.content && "mt-2")}>
+                                  {comment.attachments.map((att) => (
+                                    <a
+                                      key={att.id}
+                                      href={att.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted"
+                                    >
+                                      {att.type.startsWith('image/') ? (
+                                        <ImageIcon className="h-3 w-3" />
+                                      ) : (
+                                        <FileIcon className="h-3 w-3" />
+                                      )}
+                                      <span className="max-w-[100px] truncate">{att.name}</span>
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 

@@ -9,6 +9,7 @@ import {
   deleteChecklist,
   getTaskComments,
   createComment,
+  deleteComment,
   subscribeToTaskComments,
   getTaskAttachments,
   createAttachment,
@@ -208,6 +209,15 @@ export function useTaskDetails(projectId: string | null, taskId: string | null) 
     [projectId, taskId]
   );
 
+  // Remove comment
+  const removeComment = useCallback(
+    async (commentId: string) => {
+      if (!projectId || !taskId) return;
+      await deleteComment(projectId, taskId, commentId);
+    },
+    [projectId, taskId]
+  );
+
   // Get all comment attachments (for displaying at task top)
   const getAllCommentAttachments = useCallback(() => {
     const allAttachments: { commentId: string; attachment: CommentAttachment; createdAt: Date }[] = [];
@@ -264,6 +274,7 @@ export function useTaskDetails(projectId: string | null, taskId: string | null) 
     toggleChecklistItem,
     removeChecklistItem,
     addComment,
+    removeComment,
     getAllCommentAttachments,
     uploadAttachment,
     removeAttachment,

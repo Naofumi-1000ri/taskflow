@@ -639,6 +639,15 @@ export function subscribeToTaskComments(
   });
 }
 
+export async function deleteComment(
+  projectId: string,
+  taskId: string,
+  commentId: string
+): Promise<void> {
+  const db = getFirebaseDb();
+  await deleteDoc(doc(db, 'projects', projectId, 'tasks', taskId, 'comments', commentId));
+}
+
 // ==================== Checklists ====================
 
 export async function createChecklist(
