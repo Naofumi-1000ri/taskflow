@@ -67,10 +67,8 @@ export function useNotifications() {
       // Get all project members
       const members = await getProjectMembers(projectId);
 
-      // Create notification for each member except sender
-      const promises = members
-        .filter((m) => m.userId !== user.id)
-        .map((member) =>
+      // Create notification for all members (including sender for confirmation)
+      const promises = members.map((member) =>
           createNotification({
             userId: member.userId,
             type: 'task_bell',
