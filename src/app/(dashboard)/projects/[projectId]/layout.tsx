@@ -47,31 +47,66 @@ export default function ProjectLayout({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Project Header */}
-      <div className="mb-4 flex flex-shrink-0 items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/projects">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div className="flex items-center gap-3">
-            <div
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-xl"
-              style={{ backgroundColor: `${project.color}20` }}
-            >
-              {project.icon}
-            </div>
-            <div>
-              <h1 className="text-xl font-bold">{project.name}</h1>
-              {project.description && (
-                <p className="text-sm text-muted-foreground line-clamp-1">
-                  {project.description}
-                </p>
-              )}
-            </div>
+      {/* Twitter/X Style Header */}
+      <div className="relative mb-4 flex-shrink-0">
+        {/* Back Button - Absolute positioned */}
+        <Button
+          variant="ghost"
+          size="icon"
+          asChild
+          className="absolute left-2 top-2 z-10 bg-background/80 backdrop-blur-sm hover:bg-background/90"
+        >
+          <Link href="/projects">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        </Button>
+
+        {/* Header Image or Colored Banner */}
+        <div
+          className="w-full overflow-hidden rounded-lg"
+          style={{
+            aspectRatio: '3/1',
+            backgroundColor: project.headerImageUrl ? undefined : `${project.color}30`,
+          }}
+        >
+          {project.headerImageUrl && (
+            <img
+              src={project.headerImageUrl}
+              alt={`${project.name} header`}
+              className="h-full w-full object-cover"
+            />
+          )}
+        </div>
+
+        {/* Avatar - Overlapping */}
+        <div className="absolute -bottom-8 left-4">
+          <div className="rounded-full border-4 border-background bg-background">
+            {project.iconUrl ? (
+              <img
+                src={project.iconUrl}
+                alt={project.name}
+                className="h-16 w-16 rounded-full object-cover"
+              />
+            ) : (
+              <div
+                className="flex h-16 w-16 items-center justify-center rounded-full text-2xl"
+                style={{ backgroundColor: `${project.color}40` }}
+              >
+                {project.icon}
+              </div>
+            )}
           </div>
         </div>
+      </div>
+
+      {/* Project Info - Below Avatar */}
+      <div className="mb-4 flex-shrink-0 pl-24">
+        <h1 className="text-xl font-bold">{project.name}</h1>
+        {project.description && (
+          <p className="text-sm text-muted-foreground line-clamp-1">
+            {project.description}
+          </p>
+        )}
       </div>
 
       {/* Tabs */}

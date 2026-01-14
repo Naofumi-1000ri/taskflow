@@ -84,7 +84,7 @@ export function useProjects() {
   const update = useCallback(
     async (
       projectId: string,
-      data: Partial<{ name: string; description: string; color: string; icon: string; iconUrl?: string; urls?: ProjectUrl[] }>
+      data: Partial<{ name: string; description: string; color: string; icon: string; iconUrl?: string; headerImageUrl?: string; urls?: ProjectUrl[] }>
     ) => {
       try {
         await updateProject(projectId, data);
@@ -165,7 +165,7 @@ export function useProject(projectId: string | null) {
 
   // Update project
   const update = useCallback(
-    async (data: Partial<{ name: string; description: string; color: string; icon: string; iconUrl?: string | null; urls?: ProjectUrl[] }>) => {
+    async (data: Partial<{ name: string; description: string; color: string; icon: string; iconUrl?: string | null; headerImageUrl?: string | null; urls?: ProjectUrl[] }>) => {
       if (!projectId) return;
       try {
         await updateProject(projectId, data);
@@ -178,6 +178,7 @@ export function useProject(projectId: string | null) {
           if ('color' in data && data.color !== undefined) updated.color = data.color;
           if ('icon' in data && data.icon !== undefined) updated.icon = data.icon;
           if ('iconUrl' in data) updated.iconUrl = data.iconUrl === null || data.iconUrl === '' ? undefined : data.iconUrl;
+          if ('headerImageUrl' in data) updated.headerImageUrl = data.headerImageUrl === null || data.headerImageUrl === '' ? undefined : data.headerImageUrl;
           if ('urls' in data && data.urls !== undefined) updated.urls = data.urls;
           return updated;
         });

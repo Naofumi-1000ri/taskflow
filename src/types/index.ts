@@ -15,6 +15,7 @@ export interface Project {
   description: string;
   icon: string;
   iconUrl?: string; // Custom icon image URL (overrides emoji icon)
+  headerImageUrl?: string; // Project header/banner image URL
   color: string;
   ownerId: string;
   memberIds: string[];

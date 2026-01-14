@@ -9,6 +9,7 @@ import { ProjectFormModal } from '@/components/project/ProjectFormModal';
 import { Loader2 } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 
 export default function DashboardLayout({
   children,
@@ -38,20 +39,22 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen min-w-[480px] flex-col overflow-hidden">
-      <Header />
-      <div className="flex min-h-0 flex-1">
-        <Sidebar />
-        <main
-          className={cn(
-            'flex min-h-0 flex-1 flex-col overflow-y-auto bg-gray-50 p-4 lg:ml-0 lg:p-6',
-            isSidebarOpen && (isSidebarCollapsed ? 'ml-16' : 'ml-64')
-          )}
-        >
-          {children}
-        </main>
+    <NotificationProvider>
+      <div className="flex h-screen min-w-[480px] flex-col overflow-hidden">
+        <Header />
+        <div className="flex min-h-0 flex-1">
+          <Sidebar />
+          <main
+            className={cn(
+              'flex min-h-0 flex-1 flex-col overflow-y-auto bg-gray-50 p-4 lg:ml-0 lg:p-6',
+              isSidebarOpen && (isSidebarCollapsed ? 'ml-16' : 'ml-64')
+            )}
+          >
+            {children}
+          </main>
+        </div>
+        <ProjectFormModal />
       </div>
-      <ProjectFormModal />
-    </div>
+    </NotificationProvider>
   );
 }

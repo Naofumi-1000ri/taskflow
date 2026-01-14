@@ -109,6 +109,22 @@ export async function uploadProjectIcon(
   return url;
 }
 
+export async function uploadProjectIconBlob(
+  projectId: string,
+  blob: Blob
+): Promise<string> {
+  const storage = getFirebaseStorage();
+  const timestamp = Date.now();
+  const fileName = `icon_${timestamp}.jpg`;
+  const filePath = `projects/${projectId}/icon/${fileName}`;
+  const fileRef = ref(storage, filePath);
+
+  await uploadBytes(fileRef, blob);
+  const url = await getDownloadURL(fileRef);
+
+  return url;
+}
+
 export async function deleteProjectIcon(
   projectId: string,
   iconUrl: string
@@ -128,6 +144,45 @@ export async function deleteProjectIcon(
     }
   } catch (error) {
     console.warn('Failed to delete project icon from storage:', error);
+  }
+}
+
+// Maximum file size for header images (10MB)
+const MAX_HEADER_IMAGE_SIZE = 10 * 1024 * 1024;
+
+export async function uploadProjectHeaderImageBlob(
+  projectId: string,
+  blob: Blob
+): Promise<string> {
+  const storage = getFirebaseStorage();
+  const timestamp = Date.now();
+  const fileName = `header_${timestamp}.jpg`;
+  const filePath = `projects/${projectId}/header/${fileName}`;
+  const fileRef = ref(storage, filePath);
+
+  await uploadBytes(fileRef, blob);
+  const url = await getDownloadURL(fileRef);
+
+  return url;
+}
+
+export async function deleteProjectHeaderImage(
+  projectId: string,
+  headerImageUrl: string
+): Promise<void> {
+  const storage = getFirebaseStorage();
+
+  try {
+    const urlPath = new URL(headerImageUrl).pathname;
+    const decodedPath = decodeURIComponent(urlPath);
+    const match = decodedPath.match(/\/o\/(.+)$/);
+    if (match) {
+      const storagePath = match[1].split('?')[0];
+      const fileRef = ref(storage, storagePath);
+      await deleteObject(fileRef);
+    }
+  } catch (error) {
+    console.warn('Failed to delete project header image from storage:', error);
   }
 }
 

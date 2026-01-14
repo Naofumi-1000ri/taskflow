@@ -16,7 +16,9 @@ import type { User, ProjectRole, ProjectUrl } from '@/types';
 import { cn } from '@/lib/utils';
 import { Loader2, Trash2, UserPlus, X, Upload, Link as LinkIcon, Plus, ExternalLink } from 'lucide-react';
 import { getUsersByIds, getAllUsers } from '@/lib/firebase/firestore';
-import { uploadProjectIcon, deleteProjectIcon } from '@/lib/firebase/storage';
+import { uploadProjectIcon, deleteProjectIcon, uploadProjectIconBlob, uploadProjectHeaderImageBlob, deleteProjectHeaderImage } from '@/lib/firebase/storage';
+import { ImageCropperDialog } from '@/components/common/ImageCropperDialog';
+import { readFileAsDataURL } from '@/lib/utils/image';
 import {
   Dialog,
   DialogContent,
@@ -47,8 +49,17 @@ export default function ProjectSettingsPage() {
   const [iconUrl, setIconUrl] = useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingIcon, setIsUploadingIcon] = useState(false);
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [selectedImageSrc, setSelectedImageSrc] = useState<string>('');
   const [memberUsers, setMemberUsers] = useState<User[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Header image state
+  const [headerImageUrl, setHeaderImageUrl] = useState<string | undefined>(undefined);
+  const [isUploadingHeader, setIsUploadingHeader] = useState(false);
+  const [headerCropperOpen, setHeaderCropperOpen] = useState(false);
+  const [selectedHeaderImageSrc, setSelectedHeaderImageSrc] = useState<string>('');
+  const headerFileInputRef = useRef<HTMLInputElement>(null);
 
   // Project URLs state
   const [urls, setUrls] = useState<ProjectUrl[]>([]);
@@ -70,6 +81,7 @@ export default function ProjectSettingsPage() {
       setColor(project.color);
       setIcon(project.icon);
       setIconUrl(project.iconUrl);
+      setHeaderImageUrl(project.headerImageUrl);
       setUrls(project.urls || []);
     }
   }, [project]);
@@ -119,20 +131,41 @@ export default function ProjectSettingsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file type
+    const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      alert('画像ファイル（JPG, PNG, GIF, WebP）のみアップロード可能です');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('ファイルサイズは5MB以下にしてください');
+      return;
+    }
+
+    // Read file and open cropper
+    const imageSrc = await readFileAsDataURL(file);
+    setSelectedImageSrc(imageSrc);
+    setCropperOpen(true);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
     setIsUploadingIcon(true);
     try {
-      const url = await uploadProjectIcon(projectId, file);
+      const url = await uploadProjectIconBlob(projectId, croppedBlob);
       setIconUrl(url);
       // Save immediately
       await update({ iconUrl: url });
     } catch (error) {
       console.error('Failed to upload icon:', error);
-      alert(error instanceof Error ? error.message : 'アイコンのアップロードに失敗しました');
+      alert('アイコンのアップロードに失敗しました');
     } finally {
       setIsUploadingIcon(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
     }
   };
 
@@ -146,6 +179,61 @@ export default function ProjectSettingsPage() {
       await update({ iconUrl: null });
     } catch (error) {
       console.error('Failed to remove icon:', error);
+    }
+  };
+
+  // Header image handlers
+  const handleHeaderImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      alert('画像ファイル（JPG, PNG, GIF, WebP）のみアップロード可能です');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('ファイルサイズは10MB以下にしてください');
+      return;
+    }
+
+    // Read file and open cropper
+    const imageSrc = await readFileAsDataURL(file);
+    setSelectedHeaderImageSrc(imageSrc);
+    setHeaderCropperOpen(true);
+
+    if (headerFileInputRef.current) {
+      headerFileInputRef.current.value = '';
+    }
+  };
+
+  const handleHeaderCropComplete = async (croppedBlob: Blob) => {
+    setIsUploadingHeader(true);
+    try {
+      const url = await uploadProjectHeaderImageBlob(projectId, croppedBlob);
+      setHeaderImageUrl(url);
+      await update({ headerImageUrl: url });
+    } catch (error) {
+      console.error('Failed to upload header image:', error);
+      alert('ヘッダー画像のアップロードに失敗しました');
+    } finally {
+      setIsUploadingHeader(false);
+    }
+  };
+
+  const handleRemoveHeaderImage = async () => {
+    if (!headerImageUrl) return;
+    if (!confirm('ヘッダー画像を削除しますか？')) return;
+
+    try {
+      await deleteProjectHeaderImage(projectId, headerImageUrl);
+      setHeaderImageUrl(undefined);
+      await update({ headerImageUrl: null });
+    } catch (error) {
+      console.error('Failed to remove header image:', error);
     }
   };
 
@@ -337,6 +425,62 @@ export default function ProjectSettingsPage() {
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               保存
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Header Image */}
+        <Card>
+          <CardHeader>
+            <CardTitle>ヘッダー画像</CardTitle>
+            <CardDescription>
+              プロジェクトのヘッダーに表示されるバナー画像を設定します
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {headerImageUrl ? (
+                <div className="relative">
+                  <img
+                    src={headerImageUrl}
+                    alt="ヘッダー画像"
+                    className="w-full rounded-lg"
+                    style={{ aspectRatio: '16/9', objectFit: 'contain' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemoveHeaderImage}
+                    className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => headerFileInputRef.current?.click()}
+                  className="flex w-full cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/50 hover:border-primary hover:bg-muted/50"
+                  style={{ aspectRatio: '16/9' }}
+                >
+                  {isUploadingHeader ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  ) : (
+                    <div className="text-center">
+                      <Upload className="mx-auto h-6 w-6 text-muted-foreground" />
+                      <p className="mt-2 text-sm text-muted-foreground">クリックして画像をアップロード</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              <input
+                ref={headerFileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                onChange={handleHeaderImageUpload}
+                className="hidden"
+              />
+              <p className="text-xs text-muted-foreground">
+                推奨サイズ: 1200×675px (16:9)、最大10MB
+              </p>
+            </div>
           </CardContent>
         </Card>
 
@@ -591,6 +735,36 @@ export default function ProjectSettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Image Cropper Dialog for Icon */}
+      {selectedImageSrc && (
+        <ImageCropperDialog
+          open={cropperOpen}
+          onOpenChange={setCropperOpen}
+          imageSrc={selectedImageSrc}
+          onCropComplete={handleCropComplete}
+          shape="rect"
+          aspect={1}
+          title="プロジェクトアイコンを調整"
+          description="画像をドラッグして位置を調整し、スライダーで拡大縮小できます"
+          outputSize={256}
+        />
+      )}
+
+      {/* Image Cropper Dialog for Header */}
+      {selectedHeaderImageSrc && (
+        <ImageCropperDialog
+          open={headerCropperOpen}
+          onOpenChange={setHeaderCropperOpen}
+          imageSrc={selectedHeaderImageSrc}
+          onCropComplete={handleHeaderCropComplete}
+          shape="rect"
+          aspect={16 / 9}
+          title="ヘッダー画像を調整"
+          description="画像をドラッグして位置を調整し、スライダーで拡大縮小できます"
+          outputSize={1200}
+        />
+      )}
     </div>
   );
 }

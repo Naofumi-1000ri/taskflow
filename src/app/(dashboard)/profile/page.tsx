@@ -14,6 +14,8 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { getFirebaseDb } from '@/lib/firebase/config';
 import { getFirebaseStorage } from '@/lib/firebase/config';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ImageCropperDialog } from '@/components/common/ImageCropperDialog';
+import { readFileAsDataURL } from '@/lib/utils/image';
 
 export default function ProfilePage() {
   const { user } = useAuthStore();
@@ -23,6 +25,8 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [selectedImageSrc, setSelectedImageSrc] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const getInitials = (name: string) => {
@@ -86,12 +90,26 @@ export default function ProfilePage() {
       return;
     }
 
+    // Read file and open cropper
+    const imageSrc = await readFileAsDataURL(file);
+    setSelectedImageSrc(imageSrc);
+    setCropperOpen(true);
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
+    if (!user) return;
+
     setIsUploadingPhoto(true);
     try {
       const storage = getFirebaseStorage();
-      const photoRef = ref(storage, `users/${user.id}/profile.${file.name.split('.').pop()}`);
+      const photoRef = ref(storage, `users/${user.id}/profile.jpg`);
 
-      await uploadBytes(photoRef, file);
+      await uploadBytes(photoRef, croppedBlob);
       const photoURL = await getDownloadURL(photoRef);
 
       // Update Firestore
@@ -112,10 +130,6 @@ export default function ProfilePage() {
       alert('写真のアップロードに失敗しました');
     } finally {
       setIsUploadingPhoto(false);
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
     }
   };
 
@@ -280,6 +294,21 @@ export default function ProfilePage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Image Cropper Dialog */}
+      {selectedImageSrc && (
+        <ImageCropperDialog
+          open={cropperOpen}
+          onOpenChange={setCropperOpen}
+          imageSrc={selectedImageSrc}
+          onCropComplete={handleCropComplete}
+          shape="round"
+          aspect={1}
+          title="プロフィール画像を調整"
+          description="画像をドラッグして位置を調整し、スライダーで拡大縮小できます"
+          outputSize={256}
+        />
+      )}
     </div>
   );
 }

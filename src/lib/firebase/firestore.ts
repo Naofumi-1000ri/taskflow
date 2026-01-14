@@ -46,8 +46,9 @@ function convertDoc<T>(doc: DocumentData, id: string): T {
   return {
     ...data,
     id,
-    // Convert empty string iconUrl to undefined
+    // Convert empty string iconUrl/headerImageUrl to undefined
     iconUrl: data.iconUrl || undefined,
+    headerImageUrl: data.headerImageUrl || undefined,
     // Default values for List fields (for backward compatibility)
     autoCompleteOnEnter: data.autoCompleteOnEnter ?? false,
     autoUncompleteOnExit: data.autoUncompleteOnExit ?? false,
@@ -127,8 +128,9 @@ export async function getProject(projectId: string): Promise<Project | null> {
 }
 
 // Type for update data where optional fields can be null (to clear them)
-type ProjectUpdateData = Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'iconUrl' | 'urls'>> & {
+type ProjectUpdateData = Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'iconUrl' | 'headerImageUrl' | 'urls'>> & {
   iconUrl?: string | null;
+  headerImageUrl?: string | null;
   urls?: Project['urls'] | null;
 };
 
@@ -1005,7 +1007,6 @@ export function subscribeToUserNotifications(
   userId: string,
   callback: (notifications: Notification[]) => void
 ): () => void {
-  console.log('[Firestore] subscribeToUserNotifications for userId:', userId);
   const db = getFirebaseDb();
   const q = query(
     collection(db, 'notifications'),
@@ -1016,7 +1017,6 @@ export function subscribeToUserNotifications(
   return onSnapshot(
     q,
     (snapshot) => {
-      console.log('[Firestore] Notification snapshot received, count:', snapshot.docs.length);
       const notifications = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -1026,7 +1026,6 @@ export function subscribeToUserNotifications(
     },
     (error) => {
       console.error('[Firestore] Notification subscription error:', error);
-      console.error('[Firestore] Error message:', error.message);
       // Return empty array on error to stop loading
       callback([]);
     }
