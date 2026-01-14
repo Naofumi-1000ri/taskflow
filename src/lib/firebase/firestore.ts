@@ -127,6 +127,31 @@ export async function getProject(projectId: string): Promise<Project | null> {
   return convertDoc<Project>(projectDoc.data(), projectDoc.id);
 }
 
+// Subscribe to a single project for real-time updates
+export function subscribeToProject(
+  projectId: string,
+  callback: (project: Project | null) => void,
+  onError?: (error: Error) => void
+): () => void {
+  const db = getFirebaseDb();
+  const projectRef = doc(db, 'projects', projectId);
+
+  return onSnapshot(
+    projectRef,
+    (snapshot) => {
+      if (!snapshot.exists()) {
+        callback(null);
+        return;
+      }
+      callback(convertDoc<Project>(snapshot.data(), snapshot.id));
+    },
+    (error) => {
+      console.error('[subscribeToProject] Error:', error);
+      onError?.(error);
+    }
+  );
+}
+
 // Type for update data where optional fields can be null (to clear them)
 type ProjectUpdateData = Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'iconUrl' | 'headerImageUrl' | 'urls'>> & {
   iconUrl?: string | null;

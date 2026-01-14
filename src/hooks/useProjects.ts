@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
 import {
   createProject,
   getProject,
+  subscribeToProject,
   updateProject,
   deleteProject,
   archiveProject,
@@ -133,7 +134,7 @@ export function useProject(projectId: string | null) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  // Fetch project
+  // Subscribe to project for real-time updates
   useEffect(() => {
     if (!projectId) {
       Promise.resolve().then(() => {
@@ -144,44 +145,38 @@ export function useProject(projectId: string | null) {
       return;
     }
 
-    const fetchProject = async () => {
-      setIsLoading(true);
-      try {
-        const [projectData, membersData] = await Promise.all([
-          getProject(projectId),
-          getProjectMembers(projectId),
-        ]);
+    setIsLoading(true);
+    setError(null);
+
+    // Fetch members (one-time)
+    getProjectMembers(projectId)
+      .then(setMembers)
+      .catch((err) => console.error('[useProject] Error fetching members:', err));
+
+    // Subscribe to project for real-time updates
+    const unsubscribe = subscribeToProject(
+      projectId,
+      (projectData) => {
         setProject(projectData);
-        setMembers(membersData);
-      } catch (err) {
-        setError(err as Error);
-      } finally {
+        setIsLoading(false);
+      },
+      (err) => {
+        console.error('[useProject] Error:', err);
+        setError(err);
         setIsLoading(false);
       }
-    };
+    );
 
-    fetchProject();
+    return () => unsubscribe();
   }, [projectId]);
 
-  // Update project
+  // Update project (real-time subscription will handle state updates)
   const update = useCallback(
     async (data: Partial<{ name: string; description: string; color: string; icon: string; iconUrl?: string | null; headerImageUrl?: string | null; urls?: ProjectUrl[] }>) => {
       if (!projectId) return;
       try {
         await updateProject(projectId, data);
-        // For local state, convert null/empty to undefined for Project type compatibility
-        setProject((prev) => {
-          if (!prev) return null;
-          const updated = { ...prev };
-          if ('name' in data && data.name !== undefined) updated.name = data.name;
-          if ('description' in data && data.description !== undefined) updated.description = data.description;
-          if ('color' in data && data.color !== undefined) updated.color = data.color;
-          if ('icon' in data && data.icon !== undefined) updated.icon = data.icon;
-          if ('iconUrl' in data) updated.iconUrl = data.iconUrl === null || data.iconUrl === '' ? undefined : data.iconUrl;
-          if ('headerImageUrl' in data) updated.headerImageUrl = data.headerImageUrl === null || data.headerImageUrl === '' ? undefined : data.headerImageUrl;
-          if ('urls' in data && data.urls !== undefined) updated.urls = data.urls;
-          return updated;
-        });
+        // State will be automatically updated via subscribeToProject
       } catch (err) {
         setError(err as Error);
         throw err;
