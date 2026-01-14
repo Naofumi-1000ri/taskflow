@@ -63,9 +63,8 @@ export default function ProjectLayout({
 
         {/* Header Image or Colored Banner */}
         <div
-          className="w-full overflow-hidden rounded-lg"
+          className="w-full overflow-hidden rounded-lg h-[100px] sm:h-[120px] md:h-[150px] lg:h-[180px]"
           style={{
-            aspectRatio: '3/1',
             backgroundColor: project.headerImageUrl ? undefined : `${project.color}30`,
           }}
         >
@@ -79,17 +78,17 @@ export default function ProjectLayout({
         </div>
 
         {/* Avatar - Overlapping */}
-        <div className="absolute -bottom-8 left-4">
-          <div className="rounded-full border-4 border-background bg-background">
+        <div className="absolute -bottom-6 left-3 sm:-bottom-7 sm:left-4 lg:-bottom-8">
+          <div className="rounded-full border-2 sm:border-4 border-background bg-background">
             {project.iconUrl ? (
               <img
                 src={project.iconUrl}
                 alt={project.name}
-                className="h-16 w-16 rounded-full object-cover"
+                className="h-12 w-12 sm:h-14 sm:w-14 lg:h-16 lg:w-16 rounded-full object-cover"
               />
             ) : (
               <div
-                className="flex h-16 w-16 items-center justify-center rounded-full text-2xl"
+                className="flex h-12 w-12 sm:h-14 sm:w-14 lg:h-16 lg:w-16 items-center justify-center rounded-full text-xl sm:text-2xl"
                 style={{ backgroundColor: `${project.color}40` }}
               >
                 {project.icon}
@@ -100,7 +99,7 @@ export default function ProjectLayout({
       </div>
 
       {/* Project Info - Below Avatar */}
-      <div className="mb-4 flex-shrink-0 pl-24">
+      <div className="mb-4 flex-shrink-0 pl-[72px] sm:pl-20 lg:pl-24">
         <h1 className="text-xl font-bold">{project.name}</h1>
         {project.description && (
           <p className="text-sm text-muted-foreground line-clamp-1">
