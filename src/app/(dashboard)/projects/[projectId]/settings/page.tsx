@@ -444,7 +444,7 @@ export default function ProjectSettingsPage() {
                     src={headerImageUrl}
                     alt="ヘッダー画像"
                     className="w-full rounded-lg"
-                    style={{ aspectRatio: '16/9', objectFit: 'contain' }}
+                    style={{ aspectRatio: '3/1', objectFit: 'cover' }}
                   />
                   <button
                     type="button"
@@ -458,7 +458,7 @@ export default function ProjectSettingsPage() {
                 <div
                   onClick={() => headerFileInputRef.current?.click()}
                   className="flex w-full cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/50 hover:border-primary hover:bg-muted/50"
-                  style={{ aspectRatio: '16/9' }}
+                  style={{ aspectRatio: '3/1' }}
                 >
                   {isUploadingHeader ? (
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -478,7 +478,7 @@ export default function ProjectSettingsPage() {
                 className="hidden"
               />
               <p className="text-xs text-muted-foreground">
-                推奨サイズ: 1200×675px (16:9)、最大10MB
+                推奨サイズ: 1500×500px (3:1)、最大10MB
               </p>
             </div>
           </CardContent>
@@ -759,10 +759,10 @@ export default function ProjectSettingsPage() {
           imageSrc={selectedHeaderImageSrc}
           onCropComplete={handleHeaderCropComplete}
           shape="rect"
-          aspect={16 / 9}
+          aspect={3 / 1}
           title="ヘッダー画像を調整"
           description="画像をドラッグして位置を調整し、スライダーで拡大縮小できます"
-          outputSize={1200}
+          outputSize={1500}
         />
       )}
     </div>
