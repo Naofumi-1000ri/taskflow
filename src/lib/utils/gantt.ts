@@ -157,17 +157,25 @@ export function getColumnWidth(viewMode: ViewMode): number {
   }
 }
 
+export interface TaskBarResult {
+  start: number;
+  width: number;
+  plannedEnd?: number;    // 予定終了位置（完了タスクの場合）
+  isLate?: boolean;       // 遅延フラグ
+  isEarly?: boolean;      // 早期完了フラグ
+}
+
 // Calculate bar position and width for a task
 export function calculateTaskBar(
   task: Task,
   rangeStart: Date,
   viewMode: ViewMode,
   columnWidth: number
-): { start: number; width: number } | null {
+): TaskBarResult | null {
   const startDate = task.startDate || task.dueDate;
-  const endDate = task.dueDate || task.startDate;
+  const plannedEndDate = task.dueDate || task.startDate;
 
-  if (!startDate || !endDate) {
+  if (!startDate || !plannedEndDate) {
     return null;
   }
 
@@ -185,14 +193,32 @@ export function calculateTaskBar(
   }
 
   const startOffset = differenceInDays(startDate, rangeStart) / unitDivisor;
-  const duration = Math.max(
+  const plannedDuration = Math.max(
     1,
-    (differenceInDays(endDate, startDate) + 1) / unitDivisor
+    (differenceInDays(plannedEndDate, startDate) + 1) / unitDivisor
   );
+
+  // 完了タスクの場合、completedAtを使用
+  if (task.isCompleted && task.completedAt) {
+    const actualDuration = Math.max(
+      1,
+      (differenceInDays(task.completedAt, startDate) + 1) / unitDivisor
+    );
+    const isLate = task.completedAt > plannedEndDate;
+    const isEarly = task.completedAt < plannedEndDate;
+
+    return {
+      start: startOffset * columnWidth,
+      width: actualDuration * columnWidth,
+      plannedEnd: isEarly ? (startOffset + plannedDuration) * columnWidth : undefined,
+      isLate,
+      isEarly,
+    };
+  }
 
   return {
     start: startOffset * columnWidth,
-    width: duration * columnWidth,
+    width: plannedDuration * columnWidth,
   };
 }
 

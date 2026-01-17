@@ -295,7 +295,7 @@ export default function ProjectSettingsPage() {
   );
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div>
       <div className="max-w-2xl space-y-6 pb-8">
         {/* General Settings */}
         <Card>

@@ -1,9 +1,12 @@
 'use client';
 
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import { Bot, ChevronRight } from 'lucide-react';
 
 export default function SettingsPage() {
   return (
@@ -12,6 +15,27 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-bold">設定</h1>
         <p className="text-muted-foreground">アプリケーションの設定を管理します</p>
       </div>
+
+      {/* AI Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bot className="h-5 w-5" />
+            AI設定
+          </CardTitle>
+          <CardDescription>
+            AIアシスタントのプロバイダーとAPIキーを設定します
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link href="/settings/ai">
+            <Button variant="outline" className="w-full justify-between">
+              AI設定を開く
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
 
       {/* Notifications */}
       <Card>

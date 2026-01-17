@@ -46,13 +46,16 @@ import { useAuthStore } from '@/stores/authStore';
 import type { Task, List } from '@/types';
 import { LIST_COLORS } from '@/types';
 import { cn } from '@/lib/utils';
+import type { BoardFilters } from './BoardFilterBar';
+import { startOfDay, endOfDay, endOfWeek, isBefore, isAfter, isWithinInterval } from 'date-fns';
 
 interface BoardViewProps {
   projectId: string;
   onTaskClick: (taskId: string) => void;
+  filters?: BoardFilters;
 }
 
-export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
+export function BoardView({ projectId, onTaskClick, filters }: BoardViewProps) {
   const { firebaseUser } = useAuthStore();
   const {
     lists,
@@ -69,6 +72,72 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
     moveTask,
     reorderTasks,
   } = useBoard(projectId);
+
+  // Filter tasks based on filter criteria
+  const filterTask = useCallback((task: Task): boolean => {
+    if (!filters) return true;
+
+    // Keyword filter
+    if (filters.keyword) {
+      const keyword = filters.keyword.toLowerCase();
+      if (!task.title.toLowerCase().includes(keyword) &&
+          !task.description?.toLowerCase().includes(keyword)) {
+        return false;
+      }
+    }
+
+    // Completed filter
+    if (!filters.showCompleted && task.isCompleted) {
+      return false;
+    }
+
+    // Label filter
+    if (filters.labelIds.size > 0) {
+      const hasMatchingLabel = task.labelIds.some(id => filters.labelIds.has(id));
+      if (!hasMatchingLabel) return false;
+    }
+
+    // Due date filter
+    if (filters.dueFilter !== 'all') {
+      const now = new Date();
+      const today = startOfDay(now);
+      const todayEnd = endOfDay(now);
+      const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+
+      switch (filters.dueFilter) {
+        case 'today':
+          if (!task.dueDate || !isWithinInterval(task.dueDate, { start: today, end: todayEnd })) {
+            return false;
+          }
+          break;
+        case 'week':
+          if (!task.dueDate || !isWithinInterval(task.dueDate, { start: today, end: weekEnd })) {
+            return false;
+          }
+          break;
+        case 'overdue':
+          if (!task.dueDate || !isBefore(task.dueDate, today) || task.isCompleted) {
+            return false;
+          }
+          break;
+        case 'none':
+          if (task.dueDate) {
+            return false;
+          }
+          break;
+      }
+    }
+
+    return true;
+  }, [filters]);
+
+  // Get filtered tasks for a specific list
+  const getFilteredTasksByListId = useCallback(
+    (listId: string) => {
+      return getTasksByListId(listId).filter(filterTask);
+    },
+    [getTasksByListId, filterTask]
+  );
 
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [activeList, setActiveList] = useState<List | null>(null);
@@ -319,8 +388,8 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="h-full min-h-0 overflow-x-auto pb-4" data-testid="board-view">
-        <div className="flex h-full min-w-max gap-4">
+      <div className="pb-4" data-testid="board-view">
+        <div className="flex min-w-max gap-4">
           <SortableContext
             items={displayLists.map((l) => l.id)}
             strategy={horizontalListSortingStrategy}
@@ -330,7 +399,7 @@ export function BoardView({ projectId, onTaskClick }: BoardViewProps) {
                 key={list.id}
                 projectId={projectId}
                 list={list}
-                tasks={getTasksByListId(list.id)}
+                tasks={getFilteredTasksByListId(list.id)}
                 labels={labels}
                 tags={tags}
                 onAddTask={handleAddTask(list.id)}

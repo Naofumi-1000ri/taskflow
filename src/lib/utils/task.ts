@@ -108,3 +108,213 @@ export function isTaskOverdue(task: Task, now: Date = new Date()): boolean {
   if (!task.dueDate || task.isCompleted) return false;
   return task.dueDate.getTime() < now.getTime();
 }
+
+/**
+ * Calculate the effective start date based on task dependencies.
+ *
+ * Logic:
+ * - If all dependency tasks are completed: returns the latest completedAt date
+ * - If some dependency tasks are not completed: returns the latest dueDate
+ * - If no dependencies: returns null
+ *
+ * @param task The task to calculate the effective start date for
+ * @param allTasks All tasks in the project (to look up dependencies)
+ * @returns The effective start date, or null if no dependencies
+ */
+export function calculateEffectiveStartDate(
+  task: Task,
+  allTasks: Task[]
+): Date | null {
+  if (!task.dependsOnTaskIds || task.dependsOnTaskIds.length === 0) {
+    return null;
+  }
+
+  const dependencyTasks = allTasks.filter((t) =>
+    task.dependsOnTaskIds.includes(t.id)
+  );
+
+  if (dependencyTasks.length === 0) {
+    return null;
+  }
+
+  const allCompleted = dependencyTasks.every((t) => t.isCompleted);
+
+  if (allCompleted) {
+    // All dependencies are completed - use the latest completedAt date
+    const completedDates = dependencyTasks
+      .map((t) => t.completedAt)
+      .filter((d): d is Date => d !== null);
+
+    if (completedDates.length === 0) {
+      return null;
+    }
+
+    return new Date(Math.max(...completedDates.map((d) => d.getTime())));
+  } else {
+    // Some dependencies are not completed - use the latest dueDate
+    const dueDates = dependencyTasks
+      .map((t) => t.dueDate)
+      .filter((d): d is Date => d !== null);
+
+    if (dueDates.length === 0) {
+      return null;
+    }
+
+    return new Date(Math.max(...dueDates.map((d) => d.getTime())));
+  }
+}
+
+/**
+ * Check if adding a dependency would create a circular reference.
+ *
+ * @param taskId The task that would have the new dependency
+ * @param newDependencyId The task ID to add as a dependency
+ * @param allTasks All tasks in the project
+ * @returns true if adding this dependency would create a circular reference
+ */
+export function hasCircularDependency(
+  taskId: string,
+  newDependencyId: string,
+  allTasks: Task[]
+): boolean {
+  // A task cannot depend on itself
+  if (taskId === newDependencyId) {
+    return true;
+  }
+
+  // Use DFS to check if newDependencyId eventually depends on taskId
+  const visited = new Set<string>();
+  const stack = [newDependencyId];
+
+  while (stack.length > 0) {
+    const currentId = stack.pop()!;
+
+    if (currentId === taskId) {
+      return true; // Found circular dependency
+    }
+
+    if (visited.has(currentId)) {
+      continue;
+    }
+
+    visited.add(currentId);
+
+    const currentTask = allTasks.find((t) => t.id === currentId);
+    if (currentTask && currentTask.dependsOnTaskIds) {
+      stack.push(...currentTask.dependsOnTaskIds);
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Get all dependency tasks for a given task.
+ *
+ * @param task The task to get dependencies for
+ * @param allTasks All tasks in the project
+ * @returns Array of dependency tasks
+ */
+export function getDependencyTasks(task: Task, allTasks: Task[]): Task[] {
+  if (!task.dependsOnTaskIds || task.dependsOnTaskIds.length === 0) {
+    return [];
+  }
+
+  return allTasks.filter((t) => task.dependsOnTaskIds.includes(t.id));
+}
+
+/**
+ * Get all tasks that depend on a given task (reverse dependency lookup).
+ *
+ * @param taskId The task ID to find dependents for
+ * @param allTasks All tasks in the project
+ * @returns Array of tasks that depend on the given task
+ */
+export function getDependentTasks(taskId: string, allTasks: Task[]): Task[] {
+  return allTasks.filter(
+    (t) => t.dependsOnTaskIds && t.dependsOnTaskIds.includes(taskId)
+  );
+}
+
+/**
+ * Get all tasks that depend on a given task, recursively (entire dependency chain).
+ *
+ * @param taskId The task ID to find dependents for
+ * @param allTasks All tasks in the project
+ * @returns Array of all tasks in the dependency chain
+ */
+export function getAllDependentTasks(taskId: string, allTasks: Task[]): Task[] {
+  const result: Task[] = [];
+  const visited = new Set<string>();
+  const queue = [taskId];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+    if (visited.has(currentId)) continue;
+    visited.add(currentId);
+
+    const dependents = getDependentTasks(currentId, allTasks);
+    for (const dep of dependents) {
+      if (!visited.has(dep.id)) {
+        result.push(dep);
+        queue.push(dep.id);
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Check if a task is blocked (has incomplete dependencies).
+ *
+ * @param task The task to check
+ * @param allTasks All tasks in the project
+ * @returns true if the task has incomplete dependencies
+ */
+export function isTaskBlocked(task: Task, allTasks: Task[]): boolean {
+  if (!task.dependsOnTaskIds || task.dependsOnTaskIds.length === 0) {
+    return false;
+  }
+
+  const dependencyTasks = getDependencyTasks(task, allTasks);
+  return dependencyTasks.some((t) => !t.isCompleted);
+}
+
+/**
+ * Get the bottleneck task (the dependency causing the latest start date).
+ *
+ * @param task The task to find the bottleneck for
+ * @param allTasks All tasks in the project
+ * @returns The task causing the latest delay, or null if no dependencies
+ */
+export function getBottleneckTask(task: Task, allTasks: Task[]): Task | null {
+  if (!task.dependsOnTaskIds || task.dependsOnTaskIds.length === 0) {
+    return null;
+  }
+
+  const dependencyTasks = allTasks.filter((t) =>
+    task.dependsOnTaskIds.includes(t.id)
+  );
+
+  if (dependencyTasks.length === 0) return null;
+
+  const allCompleted = dependencyTasks.every((t) => t.isCompleted);
+
+  if (allCompleted) {
+    // All completed - find the one with the latest completedAt
+    return dependencyTasks.reduce((latest, t) => {
+      if (!t.completedAt) return latest;
+      if (!latest || !latest.completedAt) return t;
+      return t.completedAt > latest.completedAt ? t : latest;
+    }, null as Task | null);
+  } else {
+    // Some incomplete - find the incomplete one with the latest dueDate
+    const incompleteTasks = dependencyTasks.filter((t) => !t.isCompleted);
+    return incompleteTasks.reduce((latest, t) => {
+      if (!t.dueDate) return latest;
+      if (!latest || !latest.dueDate) return t;
+      return t.dueDate > latest.dueDate ? t : latest;
+    }, null as Task | null);
+  }
+}

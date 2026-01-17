@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 認証チェック
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // 1000ri.jpドメインのユーザーのみ許可
+    function isAllowedDomain() {
+      return request.auth != null &&
+             request.auth.token.email != null &&
+             request.auth.token.email.matches('.*@1000ri\\.jp$');
+    }
+
+    // 認証済み + 許可ドメインのチェック
+    function isAllowedUser() {
+      return isAuthenticated() && isAllowedDomain();
+    }
+
+    // ユーザードキュメント
+    match /users/{userId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser() && request.auth.uid == userId;
+      allow create: if isAllowedUser();
+    }
+
+    // プロジェクト - 許可ドメインの全ユーザーがアクセス可能
+    match /projects/{projectId} {
+      allow read, write: if isAllowedUser();
+
+      // プロジェクト内の全サブコレクション
+      match /members/{memberId} {
+        allow read, write: if isAllowedUser();
+      }
+
+      match /lists/{listId} {
+        allow read, write: if isAllowedUser();
+      }
+
+      match /tasks/{taskId} {
+        allow read, write: if isAllowedUser();
+
+        // タスク内のサブコレクション
+        match /comments/{commentId} {
+          allow read, write: if isAllowedUser();
+        }
+
+        match /checklists/{checklistId} {
+          allow read, write: if isAllowedUser();
+        }
+
+        match /attachments/{attachmentId} {
+          allow read, write: if isAllowedUser();
+        }
+      }
+
+      match /labels/{labelId} {
+        allow read, write: if isAllowedUser();
+      }
+
+      match /tags/{tagId} {
+        allow read, write: if isAllowedUser();
+      }
+
+      // AI会話
+      match /aiConversations/{conversationId} {
+        allow read, write: if isAllowedUser();
+
+        match /messages/{messageId} {
+          allow read, write: if isAllowedUser();
+        }
+      }
+
+      // 旧形式のconversations
+      match /conversations/{conversationId} {
+        allow read, write: if isAllowedUser();
+
+        match /messages/{messageId} {
+          allow read, write: if isAllowedUser();
+        }
+      }
+    }
+
+    // 通知
+    match /notifications/{notificationId} {
+      allow read: if isAllowedUser() && resource.data.userId == request.auth.uid;
+      allow write: if isAllowedUser();
+      allow create: if isAllowedUser();
+    }
+
+    // ユーザーメモ
+    match /userMemos/{memoId} {
+      allow read, write: if isAllowedUser();
+    }
+  }
+}

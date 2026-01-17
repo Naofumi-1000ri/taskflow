@@ -46,7 +46,7 @@ export default function ProjectLayout({
   const currentTab = pathname.split('/').pop();
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Twitter/X Style Header */}
       <div className="relative mb-4 flex-shrink-0">
         {/* Back Button - Absolute positioned */}
@@ -133,7 +133,7 @@ export default function ProjectLayout({
       </div>
 
       {/* Content */}
-      <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+      <div className="min-h-0 flex-1">{children}</div>
     </div>
   );
 }

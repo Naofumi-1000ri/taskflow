@@ -9,6 +9,9 @@ interface UIState {
   selectedTaskId: string | null;
   isProjectModalOpen: boolean;
   selectedProjectId: string | null;
+  // AI Panel state
+  isAIPanelOpen: boolean;
+  selectedConversationId: string | null;
   // Actions
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
@@ -17,6 +20,10 @@ interface UIState {
   closeTaskModal: () => void;
   openProjectModal: (projectId?: string) => void;
   closeProjectModal: () => void;
+  // AI Panel actions
+  openAIPanel: () => void;
+  closeAIPanel: () => void;
+  setSelectedConversationId: (id: string | null) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -26,6 +33,8 @@ export const useUIStore = create<UIState>((set) => ({
   selectedTaskId: null,
   isProjectModalOpen: false,
   selectedProjectId: null,
+  isAIPanelOpen: false,
+  selectedConversationId: null,
 
   toggleSidebar: () =>
     set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
@@ -45,4 +54,12 @@ export const useUIStore = create<UIState>((set) => ({
 
   closeProjectModal: () =>
     set({ isProjectModalOpen: false, selectedProjectId: null }),
+
+  openAIPanel: () => set({ isAIPanelOpen: true }),
+
+  closeAIPanel: () =>
+    set({ isAIPanelOpen: false, selectedConversationId: null }),
+
+  setSelectedConversationId: (selectedConversationId) =>
+    set({ selectedConversationId }),
 }));

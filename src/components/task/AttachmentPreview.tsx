@@ -116,7 +116,7 @@ export function AttachmentPreview({ id, name, url, type, size, compact = false }
         rel="noopener noreferrer"
         onClick={handleClick}
         className={cn(
-          "group flex items-center gap-2 rounded-lg border p-2 hover:bg-muted transition-colors cursor-pointer",
+          "group flex flex-col rounded-lg border overflow-hidden hover:bg-muted/50 transition-colors cursor-pointer",
           compact && "p-1.5"
         )}
       >
@@ -124,28 +124,16 @@ export function AttachmentPreview({ id, name, url, type, size, compact = false }
           <img
             src={url}
             alt={name}
-            className={cn(
-              "rounded object-cover",
-              compact ? "h-8 w-8" : "h-10 w-10"
-            )}
+            className="h-24 w-full rounded-t object-cover"
           />
         ) : (
-          <div className={cn(
-            "flex items-center justify-center rounded bg-muted",
-            compact ? "h-8 w-8" : "h-10 w-10"
-          )}>
-            {icon || <FileIcon className="h-5 w-5 text-muted-foreground" />}
+          <div className="flex h-24 w-full items-center justify-center rounded-t bg-muted">
+            {icon || <FileIcon className="h-8 w-8 text-muted-foreground" />}
           </div>
         )}
-        <div className="min-w-0 flex-1">
-          <p className={cn(
-            "truncate font-medium",
-            compact ? "text-[10px]" : "text-xs"
-          )}>{name}</p>
-          <p className={cn(
-            "text-muted-foreground",
-            compact ? "text-[10px]" : "text-xs"
-          )}>{formatFileSize(size)}</p>
+        <div className="min-w-0 p-2">
+          <p className="truncate text-xs font-medium">{name}</p>
+          <p className="text-xs text-muted-foreground">{formatFileSize(size)}</p>
         </div>
       </a>
 
@@ -212,7 +200,7 @@ export function AttachmentPreview({ id, name, url, type, size, compact = false }
   );
 }
 
-// Compact version for comment attachments
+// Compact version for comment attachments - Slack/Jooto style
 export function AttachmentPreviewCompact({ id, name, url, type, size }: AttachmentPreviewProps) {
   const [isOpen, setIsOpen] = useState(false);
   const previewType = canPreview(type, name);
@@ -225,6 +213,56 @@ export function AttachmentPreviewCompact({ id, name, url, type, size }: Attachme
     }
   };
 
+  // Images get large inline preview
+  if (type.startsWith('image/')) {
+    return (
+      <>
+        <button
+          onClick={handleClick}
+          className="block rounded-lg overflow-hidden border hover:opacity-90 transition-opacity cursor-pointer"
+        >
+          <img
+            src={url}
+            alt={name}
+            className="max-w-[200px] max-h-[150px] object-cover"
+          />
+        </button>
+
+        {/* Preview Dialog */}
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
+            <div className="flex flex-col h-full">
+              <div className="flex items-center justify-between p-4 border-b">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="truncate font-medium">{name}</span>
+                  <span className="text-sm text-muted-foreground flex-shrink-0">
+                    ({formatFileSize(size)})
+                  </span>
+                </div>
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary hover:underline flex-shrink-0 mr-8"
+                >
+                  新しいタブで開く
+                </a>
+              </div>
+              <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-muted/30">
+                <img
+                  src={url}
+                  alt={name}
+                  className="max-w-full max-h-[70vh] object-contain rounded"
+                />
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
+
+  // Non-images get badge style
   return (
     <>
       <a
@@ -234,14 +272,12 @@ export function AttachmentPreviewCompact({ id, name, url, type, size }: Attachme
         onClick={handleClick}
         className="flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs hover:bg-muted cursor-pointer"
       >
-        {type.startsWith('image/') ? (
-          <img src={url} alt={name} className="h-4 w-4 rounded object-cover" />
-        ) : icon ? (
-          <span className="h-3 w-3 flex items-center justify-center">{icon}</span>
+        {icon ? (
+          <span className="h-4 w-4 flex items-center justify-center">{icon}</span>
         ) : (
-          <FileIcon className="h-3 w-3" />
+          <FileIcon className="h-4 w-4" />
         )}
-        <span className="max-w-[100px] truncate">{name}</span>
+        <span className="max-w-[120px] truncate">{name}</span>
       </a>
 
       {/* Preview Dialog */}

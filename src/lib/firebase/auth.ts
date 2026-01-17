@@ -1,5 +1,7 @@
 import {
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
@@ -35,6 +37,14 @@ export function isTestMode(): boolean {
     window.location.hostname === 'localhost' ||
     window.location.hostname === '127.0.0.1';
   return isLocalhost && process.env.NEXT_PUBLIC_ENABLE_TEST_AUTH === 'true';
+}
+
+// Check if running on mobile device
+function isMobileDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  );
 }
 
 /**

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Menu, Search, User, Settings, LogOut } from 'lucide-react';
+import { Menu, Search, User, Settings, LogOut, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -19,7 +19,7 @@ import { NotificationDropdown } from './NotificationDropdown';
 
 export function Header() {
   const { user, signOut } = useAuth();
-  const { toggleSidebar } = useUIStore();
+  const { toggleSidebar, openAIPanel } = useUIStore();
 
   const getInitials = (name: string) => {
     return name
@@ -63,6 +63,17 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={openAIPanel}
+          className="relative"
+          title="AIアシスタント"
+        >
+          <Bot className="h-5 w-5" />
+          <span className="sr-only">AIアシスタント</span>
+        </Button>
+
         <NotificationDropdown />
 
         <DropdownMenu>

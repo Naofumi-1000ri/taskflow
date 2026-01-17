@@ -15,6 +15,8 @@ import {
   getProjectLabels,
   subscribeToProjectLabels,
   subscribeToProjectTags,
+  getTaskChecklists,
+  createChecklist,
 } from '@/lib/firebase/firestore';
 import type { List, Task, Label, Tag } from '@/types';
 
@@ -183,6 +185,7 @@ export function useBoard(projectId: string | null) {
         assigneeIds: [],
         labelIds: [],
         tagIds: [],
+        dependsOnTaskIds: [],
         priority: null,
         startDate: null,
         dueDate: null,
@@ -263,6 +266,60 @@ export function useBoard(projectId: string | null) {
     [projectId]
   );
 
+  // Duplicate task
+  const duplicateTask = useCallback(
+    async (taskId: string, createdBy: string): Promise<string | null> => {
+      if (!projectId) return null;
+
+      // Find the original task
+      const originalTask = state.tasks.find((t) => t.id === taskId);
+      if (!originalTask) return null;
+
+      // Calculate new order (add at end of list)
+      const tasksInList = state.tasks.filter((t) => t.listId === originalTask.listId);
+      const maxOrder = Math.max(...tasksInList.map((t) => t.order), -1);
+
+      // Create the duplicated task
+      const newTaskId = await createTask(projectId, {
+        listId: originalTask.listId,
+        title: `コピー - ${originalTask.title}`,
+        description: originalTask.description,
+        order: maxOrder + 1,
+        assigneeIds: [...originalTask.assigneeIds],
+        labelIds: [...originalTask.labelIds],
+        tagIds: [...originalTask.tagIds],
+        dependsOnTaskIds: [], // Don't copy dependencies
+        priority: originalTask.priority,
+        startDate: originalTask.startDate,
+        dueDate: originalTask.dueDate,
+        isCompleted: false, // New task starts as incomplete
+        completedAt: null,
+        isAbandoned: false,
+        createdBy,
+      });
+
+      // Copy checklists with items unchecked
+      try {
+        const checklists = await getTaskChecklists(projectId, taskId);
+        for (const checklist of checklists) {
+          await createChecklist(projectId, newTaskId, {
+            title: checklist.title,
+            order: checklist.order,
+            items: checklist.items.map((item) => ({
+              ...item,
+              isChecked: false, // Uncheck all items
+            })),
+          });
+        }
+      } catch (error) {
+        console.error('Failed to copy checklists:', error);
+      }
+
+      return newTaskId;
+    },
+    [projectId, state.tasks]
+  );
+
   return {
     lists: state.lists,
     tasks: state.tasks,
@@ -280,5 +337,6 @@ export function useBoard(projectId: string | null) {
     removeTask,
     moveTask,
     reorderTasks,
+    duplicateTask,
   };
 }

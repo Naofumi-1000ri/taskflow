@@ -55,6 +55,9 @@ function convertDoc<T>(doc: DocumentData, id: string): T {
     // Default values for Task fields (for backward compatibility)
     completedAt: data.completedAt ? toDate(data.completedAt) : null,
     isAbandoned: data.isAbandoned ?? false,
+    dependsOnTaskIds: data.dependsOnTaskIds ?? [],
+    // Default values for Project fields (for backward compatibility)
+    order: data.order ?? 0,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   } as T;
@@ -215,16 +218,15 @@ export function subscribeToUserProjects(
   const q = query(
     collection(db, 'projects'),
     where('memberIds', 'array-contains', userId),
-    where('isArchived', '==', false),
-    orderBy('updatedAt', 'desc')
+    where('isArchived', '==', false)
   );
 
   return onSnapshot(
     q,
     (snapshot) => {
-      const projects = snapshot.docs.map((doc) =>
-        convertDoc<Project>(doc.data(), doc.id)
-      );
+      const projects = snapshot.docs
+        .map((doc) => convertDoc<Project>(doc.data(), doc.id))
+        .sort((a, b) => a.order - b.order); // Sort by order
       callback(projects);
     },
     (error) => {
@@ -234,6 +236,26 @@ export function subscribeToUserProjects(
       }
     }
   );
+}
+
+export async function updateProjectOrder(projectId: string, order: number): Promise<void> {
+  const db = getFirebaseDb();
+  await updateDoc(doc(db, 'projects', projectId), {
+    order,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function reorderProjects(projectIds: string[]): Promise<void> {
+  const db = getFirebaseDb();
+  const batch = writeBatch(db);
+
+  projectIds.forEach((projectId, index) => {
+    const projectRef = doc(db, 'projects', projectId);
+    batch.update(projectRef, { order: index });
+  });
+
+  await batch.commit();
 }
 
 // ==================== Project Members ====================

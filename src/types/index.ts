@@ -21,6 +21,7 @@ export interface Project {
   memberIds: string[];
   urls?: ProjectUrl[]; // Related URLs for the project
   isArchived: boolean;
+  order: number; // Display order in sidebar
   createdAt: Date;
   updatedAt: Date;
 }
@@ -65,6 +66,7 @@ export interface Task {
   assigneeIds: string[];
   labelIds: string[];
   tagIds: string[];
+  dependsOnTaskIds: string[]; // Task IDs that must be completed before this task can start
   priority: Priority | null;
   startDate: Date | null;
   dueDate: Date | null;

@@ -50,9 +50,20 @@ import {
   Circle,
   Pencil,
   Bell,
+  Link2,
+  AlertCircle,
+  Lock,
+  Copy,
 } from 'lucide-react';
 import { formatFileSize, getFileIcon } from '@/lib/firebase/storage';
 import { cn, linkifyText } from '@/lib/utils';
+import {
+  calculateEffectiveStartDate,
+  hasCircularDependency,
+  getDependencyTasks,
+  isTaskBlocked,
+  getBottleneckTask,
+} from '@/lib/utils/task';
 import { useTaskDetails } from '@/hooks/useTaskDetails';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useAuthStore } from '@/stores/authStore';
@@ -67,10 +78,12 @@ interface TaskDetailModalProps {
   projectId: string;
   lists: List[];
   labels: LabelType[];
+  allTasks: Task[]; // All tasks in the project for dependency selection
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (data: Partial<Task>) => void;
   onDelete: () => void;
+  onDuplicate?: () => void;
 }
 
 export function TaskDetailModal({
@@ -78,10 +91,12 @@ export function TaskDetailModal({
   projectId,
   lists,
   labels,
+  allTasks,
   isOpen,
   onClose,
   onUpdate,
   onDelete,
+  onDuplicate,
 }: TaskDetailModalProps) {
   const { user } = useAuthStore();
   const { sendBellNotification } = useNotifications();
@@ -302,6 +317,31 @@ export function TaskDetailModal({
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const imageFiles: File[] = [];
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          // ファイル名を生成（タイムスタンプ付き）
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          const extension = file.type.split('/')[1] || 'png';
+          const namedFile = new File([file], `pasted-image-${timestamp}.${extension}`, {
+            type: file.type,
+          });
+          imageFiles.push(namedFile);
+        }
+      }
+    }
+
+    if (imageFiles.length > 0) {
+      setPendingFiles((prev) => [...prev, ...imageFiles]);
+    }
+  };
+
   // Get all comment attachments for Jooto-style display at task top
   const commentAttachments = getAllCommentAttachments();
 
@@ -491,27 +531,55 @@ export function TaskDetailModal({
                 {/* Start Date */}
                 <div className="flex items-center gap-3 py-2 text-sm">
                   <CalendarIcon className="h-5 w-5 text-muted-foreground" />
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button className="text-muted-foreground hover:text-foreground">
-                        {startDate ? (
-                          <span>開始: {format(startDate, 'M/d', { locale: ja })}</span>
-                        ) : (
-                          '開始日を設定'
-                        )}
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-4" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={startDate}
-                        onSelect={(date) => {
-                          setStartDate(date);
-                          onUpdate({ startDate: date || null });
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  {task?.dependsOnTaskIds && task.dependsOnTaskIds.length > 0 ? (
+                    // 依存タスクあり: ロック表示
+                    <div className="flex flex-1 items-center gap-2">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <span>
+                          開始: {(() => {
+                            const date = calculateEffectiveStartDate(task, allTasks);
+                            return date ? format(date, 'M/d', { locale: ja }) : '未定';
+                          })()}
+                        </span>
+                        <Lock className="h-3 w-3" />
+                      </div>
+                      {/* ボトルネックタスク表示 */}
+                      {(() => {
+                        const bottleneck = getBottleneckTask(task, allTasks);
+                        if (bottleneck) {
+                          return (
+                            <span className="ml-auto max-w-[150px] truncate text-xs text-amber-600">
+                              ← {bottleneck.title}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+                  ) : (
+                    // 依存タスクなし: 編集可能
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="text-muted-foreground hover:text-foreground">
+                          {startDate ? (
+                            <span>開始: {format(startDate, 'M/d', { locale: ja })}</span>
+                          ) : (
+                            '開始日を設定'
+                          )}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-4" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={startDate}
+                          onSelect={(date) => {
+                            setStartDate(date);
+                            onUpdate({ startDate: date || null });
+                          }}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  )}
                 </div>
 
                 {/* Due Date */}
@@ -538,6 +606,184 @@ export function TaskDetailModal({
                       />
                     </PopoverContent>
                   </Popover>
+                </div>
+
+                {/* Dependencies */}
+                <div className="flex items-start gap-3 py-2 text-sm">
+                  <Link2 className="mt-0.5 h-5 w-5 text-muted-foreground" />
+                  <div className="flex-1 space-y-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="text-muted-foreground hover:text-foreground">
+                          依存タスク: {task?.dependsOnTaskIds?.length || 0}件
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80" align="start">
+                        <div className="space-y-3">
+                          <p className="text-sm font-medium">依存タスク（このタスクの前に完了が必要）</p>
+                          <ScrollArea className="max-h-60">
+                            <div className="space-y-1">
+                              {allTasks
+                                .filter((t) => t.id !== task?.id) // Exclude current task
+                                .sort((a, b) => {
+                                  // Sort by list order, then by order within list
+                                  const listA = lists.find((l) => l.id === a.listId);
+                                  const listB = lists.find((l) => l.id === b.listId);
+                                  const listOrderA = listA?.order ?? 0;
+                                  const listOrderB = listB?.order ?? 0;
+                                  if (listOrderA !== listOrderB) return listOrderA - listOrderB;
+                                  return a.order - b.order;
+                                })
+                                .map((t) => {
+                                  const isSelected = task?.dependsOnTaskIds?.includes(t.id);
+                                  const wouldCreateCircular = !isSelected && task && hasCircularDependency(task.id, t.id, allTasks);
+                                  const taskList = lists.find((l) => l.id === t.listId);
+
+                                  return (
+                                    <button
+                                      key={t.id}
+                                      onClick={() => {
+                                        if (wouldCreateCircular) return;
+                                        const currentDeps = task?.dependsOnTaskIds || [];
+                                        const newDeps = isSelected
+                                          ? currentDeps.filter((id) => id !== t.id)
+                                          : [...currentDeps, t.id];
+
+                                        // Calculate new effective start date based on dependencies
+                                        const tempTask = { ...task!, dependsOnTaskIds: newDeps };
+                                        const effectiveStartDate = calculateEffectiveStartDate(tempTask, allTasks);
+
+                                        // Update both dependencies and start date
+                                        const updateData: Partial<Task> = { dependsOnTaskIds: newDeps };
+                                        if (effectiveStartDate) {
+                                          updateData.startDate = effectiveStartDate;
+                                        } else if (newDeps.length === 0) {
+                                          // If removing all dependencies, keep the current startDate (don't reset it)
+                                        }
+                                        onUpdate(updateData);
+                                      }}
+                                      disabled={wouldCreateCircular}
+                                      className={cn(
+                                        'flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors',
+                                        isSelected && 'bg-muted',
+                                        wouldCreateCircular
+                                          ? 'cursor-not-allowed opacity-50'
+                                          : 'hover:bg-muted'
+                                      )}
+                                    >
+                                      <div
+                                        className="h-2 w-2 flex-shrink-0 rounded-full"
+                                        style={{ backgroundColor: taskList?.color || '#6b7280' }}
+                                      />
+                                      <span className={cn(
+                                        'flex-1 truncate text-left',
+                                        t.isCompleted && 'line-through text-muted-foreground'
+                                      )}>
+                                        {t.title}
+                                      </span>
+                                      {t.isCompleted ? (
+                                        <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-green-600" />
+                                      ) : t.dueDate ? (
+                                        <span className="flex-shrink-0 text-xs text-muted-foreground">
+                                          〜{format(t.dueDate, 'M/d', { locale: ja })}
+                                        </span>
+                                      ) : null}
+                                      {isSelected && (
+                                        <Check className="h-4 w-4 flex-shrink-0 text-primary" />
+                                      )}
+                                      {wouldCreateCircular && (
+                                        <AlertCircle className="h-4 w-4 flex-shrink-0 text-destructive" />
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                            </div>
+                          </ScrollArea>
+                          {allTasks.filter((t) => t.id !== task?.id).length === 0 && (
+                            <p className="text-xs text-muted-foreground">他にタスクがありません</p>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+
+                    {/* Selected dependencies display */}
+                    {task?.dependsOnTaskIds && task.dependsOnTaskIds.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {getDependencyTasks(task, allTasks).map((depTask) => {
+                          const taskList = lists.find((l) => l.id === depTask.listId);
+                          return (
+                            <Badge
+                              key={depTask.id}
+                              variant="outline"
+                              className={cn(
+                                'flex items-center gap-1',
+                                depTask.isCompleted && 'bg-green-50 border-green-200'
+                              )}
+                            >
+                              <div
+                                className="h-1.5 w-1.5 rounded-full"
+                                style={{ backgroundColor: taskList?.color || '#6b7280' }}
+                              />
+                              <span className={cn(
+                                'max-w-[100px] truncate',
+                                depTask.isCompleted && 'line-through'
+                              )}>
+                                {depTask.title}
+                              </span>
+                              {depTask.isCompleted ? (
+                                <CheckCircle2 className="h-3 w-3 text-green-600" />
+                              ) : depTask.dueDate ? (
+                                <span className="text-xs text-muted-foreground">
+                                  〜{format(depTask.dueDate, 'M/d', { locale: ja })}
+                                </span>
+                              ) : null}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newDeps = task.dependsOnTaskIds.filter((id) => id !== depTask.id);
+
+                                  // Calculate new effective start date based on remaining dependencies
+                                  const tempTask = { ...task, dependsOnTaskIds: newDeps };
+                                  const effectiveStartDate = calculateEffectiveStartDate(tempTask, allTasks);
+
+                                  // Update both dependencies and start date
+                                  const updateData: Partial<Task> = { dependsOnTaskIds: newDeps };
+                                  if (effectiveStartDate) {
+                                    updateData.startDate = effectiveStartDate;
+                                  }
+                                  onUpdate(updateData);
+                                }}
+                                className="ml-0.5 text-muted-foreground hover:text-foreground"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Effective start date display */}
+                    {task && (() => {
+                      const effectiveDate = calculateEffectiveStartDate(task, allTasks);
+                      const blocked = isTaskBlocked(task, allTasks);
+                      if (effectiveDate) {
+                        return (
+                          <p className={cn(
+                            'text-xs',
+                            blocked ? 'text-amber-600' : 'text-green-600'
+                          )}>
+                            {blocked ? (
+                              <>開始可能日: {format(effectiveDate, 'M/d', { locale: ja })}（依存タスク未完了）</>
+                            ) : (
+                              <>開始可能日: {format(effectiveDate, 'M/d', { locale: ja })}（依存タスク完了済み）</>
+                            )}
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
                 </div>
 
                 {/* Assignee */}
@@ -897,33 +1143,62 @@ export function TaskDetailModal({
                   <Textarea
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
-                    placeholder="コメントを書く"
+                    onPaste={handlePaste}
+                    placeholder="コメントを書く（画像は貼り付け可能）"
                     rows={3}
                     className="resize-none break-all border-none p-0 shadow-none focus-visible:ring-0"
                   />
                   {/* Pending Files Preview */}
                   {pendingFiles.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {pendingFiles.map((file, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center gap-1 rounded border bg-muted px-2 py-1 text-xs"
-                        >
-                          {file.type.startsWith('image/') ? (
-                            <ImageIcon className="h-3 w-3" />
-                          ) : (
-                            <FileIcon className="h-3 w-3" />
-                          )}
-                          <span className="max-w-[100px] truncate">{file.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => removePendingFile(index)}
-                            className="ml-1 text-muted-foreground hover:text-foreground"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
+                    <div className="mt-2 space-y-2">
+                      {/* Image previews - large thumbnails */}
+                      {pendingFiles.filter(f => f.type.startsWith('image/')).length > 0 && (
+                        <div className="grid grid-cols-2 gap-2">
+                          {pendingFiles.map((file, index) => {
+                            if (!file.type.startsWith('image/')) return null;
+                            return (
+                              <div key={index} className="relative group">
+                                <img
+                                  src={URL.createObjectURL(file)}
+                                  alt={file.name}
+                                  className="w-full max-h-40 rounded-lg object-cover border"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removePendingFile(index)}
+                                  className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/80"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            );
+                          })}
                         </div>
-                      ))}
+                      )}
+                      {/* Non-image files - badge style */}
+                      {pendingFiles.filter(f => !f.type.startsWith('image/')).length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {pendingFiles.map((file, index) => {
+                            if (file.type.startsWith('image/')) return null;
+                            return (
+                              <div
+                                key={index}
+                                className="flex items-center gap-1 rounded border bg-muted px-2 py-1 text-xs"
+                              >
+                                <FileIcon className="h-3 w-3" />
+                                <span className="max-w-[100px] truncate">{file.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => removePendingFile(index)}
+                                  className="ml-1 text-muted-foreground hover:text-foreground"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className="mt-2 flex flex-shrink-0 items-center justify-between">
@@ -957,6 +1232,17 @@ export function TaskDetailModal({
               </span>
             </div>
             <div className="flex items-center gap-2">
+              {onDuplicate && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onDuplicate}
+                  className="h-8"
+                  title="タスクを複製"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"

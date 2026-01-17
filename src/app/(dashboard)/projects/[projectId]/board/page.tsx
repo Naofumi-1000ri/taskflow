@@ -3,19 +3,28 @@
 import { useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { BoardView } from '@/components/board/BoardView';
+import { BoardFilterBar, type BoardFilters } from '@/components/board/BoardFilterBar';
 import { ProjectUrlsBar } from '@/components/board/ProjectUrlsBar';
 import { TaskDetailModal } from '@/components/task/TaskDetailModal';
 import { useBoard } from '@/hooks/useBoard';
 import { useProject } from '@/hooks/useProjects';
+import { useAuthStore } from '@/stores/authStore';
 import type { ProjectUrl } from '@/types';
 
 export default function BoardPage() {
   const params = useParams();
   const projectId = params.projectId as string;
-  const { lists, tasks, labels, editTask, removeTask } = useBoard(projectId);
+  const { user } = useAuthStore();
+  const { lists, tasks, labels, editTask, removeTask, duplicateTask } = useBoard(projectId);
   const { project, update: updateProject } = useProject(projectId);
 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [filters, setFilters] = useState<BoardFilters>({
+    keyword: '',
+    labelIds: new Set(),
+    dueFilter: 'all',
+    showCompleted: true,
+  });
 
   const selectedTask = selectedTaskId
     ? tasks.find((t) => t.id === selectedTaskId) || null
@@ -44,6 +53,15 @@ export default function BoardPage() {
       setSelectedTaskId(null);
     }
   }, [selectedTaskId, removeTask]);
+
+  const handleDuplicateTask = useCallback(async () => {
+    if (selectedTaskId && user) {
+      const newTaskId = await duplicateTask(selectedTaskId, user.id);
+      if (newTaskId) {
+        setSelectedTaskId(newTaskId); // Open the new task
+      }
+    }
+  }, [selectedTaskId, user, duplicateTask]);
 
   // URL handlers
   const handleAddUrl = useCallback(
@@ -75,25 +93,36 @@ export default function BoardPage() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <ProjectUrlsBar
-        urls={project?.urls || []}
-        onAddUrl={handleAddUrl}
-        onEditUrl={handleEditUrl}
-        onRemoveUrl={handleRemoveUrl}
-      />
-      <div className="min-h-0 flex-1">
-        <BoardView projectId={projectId} onTaskClick={handleTaskClick} />
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="flex-shrink-0">
+        <ProjectUrlsBar
+          urls={project?.urls || []}
+          onAddUrl={handleAddUrl}
+          onEditUrl={handleEditUrl}
+          onRemoveUrl={handleRemoveUrl}
+        />
+      </div>
+      <div className="flex-shrink-0">
+        <BoardFilterBar
+          filters={filters}
+          labels={labels}
+          onFiltersChange={setFilters}
+        />
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto">
+        <BoardView projectId={projectId} onTaskClick={handleTaskClick} filters={filters} />
       </div>
       <TaskDetailModal
         task={selectedTask}
         projectId={projectId}
         lists={lists}
         labels={labels}
+        allTasks={tasks}
         isOpen={!!selectedTaskId}
         onClose={handleCloseModal}
         onUpdate={handleUpdateTask}
         onDelete={handleDeleteTask}
+        onDuplicate={handleDuplicateTask}
       />
     </div>
   );

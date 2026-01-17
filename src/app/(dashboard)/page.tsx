@@ -6,6 +6,8 @@ import { WifiOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PersonalMemo } from '@/components/dashboard/PersonalMemo';
 import { MyTasks } from '@/components/dashboard/MyTasks';
+import { OverdueTasksAlert } from '@/components/dashboard/OverdueTasksAlert';
+import { ProjectProgress } from '@/components/dashboard/ProjectProgress';
 
 export default function DashboardPage() {
   const { user, isLoading } = useAuth();
@@ -37,6 +39,9 @@ export default function DashboardPage() {
         </p>
       </div>
 
+      {/* Overdue Tasks Alert */}
+      <OverdueTasksAlert />
+
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Personal Memo */}
         <PersonalMemo />
@@ -44,6 +49,9 @@ export default function DashboardPage() {
         {/* My Tasks */}
         <MyTasks />
       </div>
+
+      {/* Project Progress */}
+      <ProjectProgress />
     </div>
   );
 }

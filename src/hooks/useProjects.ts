@@ -10,6 +10,7 @@ import {
   deleteProject,
   archiveProject,
   subscribeToUserProjects,
+  reorderProjects,
   getProjectMembers,
   addProjectMember,
   removeProjectMember,
@@ -69,6 +70,7 @@ export function useProjects() {
             ownerId: firebaseUser.uid,
             memberIds: [firebaseUser.uid],
             isArchived: false,
+            order: projects.length,
           },
           firebaseUser.uid
         );
@@ -78,7 +80,7 @@ export function useProjects() {
         throw err;
       }
     },
-    [firebaseUser]
+    [firebaseUser, projects.length]
   );
 
   // Update project
@@ -117,6 +119,16 @@ export function useProjects() {
     }
   }, []);
 
+  // Reorder projects
+  const reorder = useCallback(async (projectIds: string[]) => {
+    try {
+      await reorderProjects(projectIds);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  }, []);
+
   return {
     projects,
     isLoading,
@@ -125,6 +137,7 @@ export function useProjects() {
     update,
     remove,
     archive,
+    reorder,
   };
 }
 

@@ -125,7 +125,7 @@ export function BoardList({
       ref={setSortableNodeRef}
       style={style}
       className={cn(
-        'flex h-full max-h-full min-h-0 w-72 flex-shrink-0 flex-col rounded-lg bg-gray-100 transition-colors',
+        'flex w-72 flex-shrink-0 flex-col rounded-lg bg-gray-100 transition-colors',
         isOver && 'bg-gray-200',
         isDragging && 'opacity-0'
       )}
@@ -264,7 +264,7 @@ export function BoardList({
       {/* Tasks */}
       <div
         ref={setDroppableNodeRef}
-        className="board-list-scroll min-h-0 flex-1 space-y-2 px-3 pb-3"
+        className="space-y-2 px-3 pb-3"
       >
         <SortableContext
           items={tasks.map((t) => t.id)}
