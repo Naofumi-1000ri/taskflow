@@ -136,7 +136,8 @@ interface UseAIMessagesReturn {
   isLoading: boolean;
   error: string | null;
   addUserMessage: (content: string) => Promise<string | null>;
-  addAssistantMessage: (content: string) => Promise<string | null>;
+  addAssistantMessage: (content: string, toolCalls?: AIMessage['toolCalls']) => Promise<string | null>;
+  addToolResultMessage: (content: string, toolCallId: string, toolName: string, thoughtSignature?: string) => Promise<string | null>;
   loadMessages: () => Promise<void>;
 }
 
@@ -192,17 +193,40 @@ export function useAIMessages({
   );
 
   const addAssistantMessage = useCallback(
-    async (content: string): Promise<string | null> => {
+    async (content: string, toolCalls?: AIMessage['toolCalls']): Promise<string | null> => {
       if (!projectId || !conversationId) return null;
 
       try {
         const messageId = await addMessage(projectId, conversationId, {
           role: 'assistant',
           content,
+          toolCalls,
         });
         return messageId;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to add message';
+        setError(errorMessage);
+        return null;
+      }
+    },
+    [projectId, conversationId]
+  );
+
+  const addToolResultMessage = useCallback(
+    async (content: string, toolCallId: string, toolName: string, thoughtSignature?: string): Promise<string | null> => {
+      if (!projectId || !conversationId) return null;
+
+      try {
+        const messageId = await addMessage(projectId, conversationId, {
+          role: 'tool',
+          content,
+          toolCallId,
+          toolName,
+          thoughtSignature,
+        });
+        return messageId;
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to add tool result message';
         setError(errorMessage);
         return null;
       }
@@ -231,6 +255,7 @@ export function useAIMessages({
     error,
     addUserMessage,
     addAssistantMessage,
+    addToolResultMessage,
     loadMessages,
   };
 }

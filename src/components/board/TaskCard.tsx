@@ -5,7 +5,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { Calendar, Bell, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, Calendar, Bell, CheckCircle2, Clock, Link2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -15,22 +15,29 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { getUsersByIds, getTaskAttachments, getProject } from '@/lib/firebase/firestore';
 import { useNotifications } from '@/hooks/useNotifications';
 import type { Task, Label, Tag, User as UserType, Attachment } from '@/types';
-import { isTaskOverdue } from '@/lib/utils/task';
+import { isTaskOverdue, getEffectiveDates } from '@/lib/utils/task';
 
 interface TaskCardProps {
   projectId: string;
   task: Task;
   labels: Label[];
   tags: Tag[];
+  allTasks?: Task[]; // For dependency lookup
   onClick: () => void;
   isDragging?: boolean;
 }
 
-export function TaskCard({ projectId, task, labels, tags, onClick, isDragging }: TaskCardProps) {
+export function TaskCard({ projectId, task, labels, tags, allTasks, onClick, isDragging }: TaskCardProps) {
   const [assignees, setAssignees] = useState<UserType[]>([]);
   const [imageAttachments, setImageAttachments] = useState<Attachment[]>([]);
   const [bellMessage, setBellMessage] = useState('');
@@ -116,6 +123,21 @@ export function TaskCard({ projectId, task, labels, tags, onClick, isDragging }:
   const taskTags = tags.filter((tag) => task.tagIds?.includes(tag.id));
   const isOverdue = isTaskOverdue(task);
 
+  // Calculate dependency info
+  const dependentTasks = allTasks
+    ? task.dependsOnTaskIds
+        .map((id) => allTasks.find((t) => t.id === id))
+        .filter((t): t is Task => t !== undefined)
+    : [];
+
+  // Get effective dates using shared helper
+  const effectiveDates = allTasks ? getEffectiveDates(task, allTasks) : null;
+  const predictedDates = effectiveDates?.isPredicted && effectiveDates.predictedStart && effectiveDates.predictedEnd
+    ? { start: effectiveDates.predictedStart, end: effectiveDates.predictedEnd }
+    : null;
+  const isDeadlineOverdue = effectiveDates?.isDeadlineOverdue ?? false;
+  const hasDependencies = dependentTasks.length > 0;
+
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -135,7 +157,8 @@ export function TaskCard({ projectId, task, labels, tags, onClick, isDragging }:
       data-testid="task-card"
       className={cn(
         'group cursor-pointer rounded-lg border bg-white shadow-sm transition-shadow hover:shadow-md',
-        (isDragging || isSortableDragging) && 'opacity-50 shadow-lg'
+        (isDragging || isSortableDragging) && 'opacity-50 shadow-lg',
+        isDeadlineOverdue && 'border-red-500 border-2 bg-red-50'
       )}
     >
       {/* Image Attachments - displayed at top like Jooto */}
@@ -271,27 +294,49 @@ export function TaskCard({ projectId, task, labels, tags, onClick, isDragging }:
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {/* Completion Date - shown when completed */}
             {task.isCompleted && task.completedAt && (
-              <div className="flex items-center gap-1 text-green-600">
-                <CheckCircle2 className="h-3 w-3" />
-                <span>完了: {format(task.completedAt, 'M/d', { locale: ja })}</span>
-              </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1 text-green-600 cursor-default">
+                      <CheckCircle2 className="h-3 w-3" />
+                      <span>完了: {format(task.completedAt, 'M/d', { locale: ja })}</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{format(task.completedAt, 'yyyy年M月d日', { locale: ja })}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
 
             {/* Date Range - not shown as overdue if completed */}
             {!task.isCompleted && (task.startDate || task.dueDate) && (
-              <div
-                className={cn(
-                  'flex items-center gap-1',
-                  isOverdue && 'text-red-500'
-                )}
-              >
-                <Calendar className="h-3 w-3" />
-                <span>
-                  {task.startDate && format(task.startDate, 'M/d', { locale: ja })}
-                  {task.startDate && task.dueDate && ' - '}
-                  {task.dueDate && format(task.dueDate, 'M/d', { locale: ja })}
-                </span>
-              </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div
+                      className={cn(
+                        'flex items-center gap-1 cursor-default',
+                        isOverdue && 'text-red-500'
+                      )}
+                    >
+                      <Calendar className="h-3 w-3" />
+                      <span>
+                        {task.startDate && format(task.startDate, 'M/d', { locale: ja })}
+                        {task.startDate && task.dueDate && ' - '}
+                        {task.dueDate && format(task.dueDate, 'M/d', { locale: ja })}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>
+                      {task.startDate && format(task.startDate, 'yyyy年M月d日', { locale: ja })}
+                      {task.startDate && task.dueDate && ' 〜 '}
+                      {task.dueDate && format(task.dueDate, 'yyyy年M月d日', { locale: ja })}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
 
             {/* Priority Badge */}
@@ -307,6 +352,103 @@ export function TaskCard({ projectId, task, labels, tags, onClick, isDragging }:
               >
                 {task.priority === 'high' ? '高' : task.priority === 'medium' ? '中' : '低'}
               </Badge>
+            )}
+          </div>
+        )}
+
+        {/* Dependencies and Duration Row */}
+        {(hasDependencies || task.durationDays || isDeadlineOverdue) && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            {/* Deadline Overdue Warning */}
+            {isDeadlineOverdue && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1 text-red-600 font-medium cursor-default">
+                      <AlertTriangle className="h-3 w-3" />
+                      <span>期限超過</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>依存タスクの遅延により、開始日が期限を超過しています</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
+            {/* Duration Badge */}
+            {task.durationDays && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1 text-blue-600 cursor-default">
+                      <Clock className="h-3 w-3" />
+                      <span>{task.durationDays}日間</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>必要期間: {task.durationDays}日</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
+            {/* Dependencies */}
+            {hasDependencies && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1 text-purple-600 cursor-default">
+                      <Link2 className="h-3 w-3" />
+                      <span className="truncate max-w-[100px]">
+                        {dependentTasks[0].title}
+                        {dependentTasks.length > 1 && ` 他${dependentTasks.length - 1}件`}
+                        後
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="space-y-1">
+                      <p className="font-medium">依存タスク:</p>
+                      {dependentTasks.map((dep) => (
+                        <p key={dep.id} className="flex items-center gap-1">
+                          {dep.isCompleted ? (
+                            <CheckCircle2 className="h-3 w-3 text-green-500" />
+                          ) : (
+                            <span className="h-3 w-3 rounded-full border border-gray-300" />
+                          )}
+                          <span className={dep.isCompleted ? 'line-through text-muted-foreground' : ''}>
+                            {dep.title}
+                          </span>
+                        </p>
+                      ))}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
+            {/* Predicted Dates */}
+            {predictedDates && !task.startDate && !task.dueDate && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1 text-amber-600 cursor-default">
+                      <Calendar className="h-3 w-3" />
+                      <span>
+                        予測: {format(predictedDates.start, 'M/d', { locale: ja })}〜{format(predictedDates.end, 'M/d', { locale: ja })}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>
+                      依存タスク完了後の予測日程:
+                      <br />
+                      {format(predictedDates.start, 'yyyy年M月d日', { locale: ja })} 〜 {format(predictedDates.end, 'yyyy年M月d日', { locale: ja })}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
         )}

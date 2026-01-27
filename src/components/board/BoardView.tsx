@@ -239,13 +239,25 @@ export function BoardView({ projectId, onTaskClick, filters }: BoardViewProps) {
       const activeTask = tasks.find((t) => t.id === activeId);
       if (!activeTask) return;
 
-      // Check if dropping over a list
+      // Check if dropping over a list's droppable container (id: "list-xxx")
       if (overId.startsWith('list-')) {
         const newListId = overId.replace('list-', '');
         if (activeTask.listId !== newListId) {
           // Move to new list
           const tasksInNewList = getTasksByListId(newListId);
           moveTask(activeId, newListId, tasksInNewList.length);
+        }
+        return;
+      }
+
+      // Check if dropping over a list's sortable container (id: list.id)
+      // This happens when rectIntersection picks the larger list container
+      // instead of the smaller droppable area (e.g., when the list has few/no tasks)
+      const overList = displayLists.find((l) => l.id === overId);
+      if (overList) {
+        if (activeTask.listId !== overList.id) {
+          const tasksInNewList = getTasksByListId(overList.id);
+          moveTask(activeId, overList.id, tasksInNewList.length);
         }
         return;
       }
@@ -306,8 +318,24 @@ export function BoardView({ projectId, onTaskClick, filters }: BoardViewProps) {
 
       if (!activeTaskItem) return;
 
+      // Check if dropping onto a list container (fallback for handleDragOver)
+      if (!overTask) {
+        let targetListId: string | null = null;
+        if (overId.startsWith('list-')) {
+          targetListId = overId.replace('list-', '');
+        } else {
+          const overList = displayLists.find((l) => l.id === overId);
+          if (overList) targetListId = overList.id;
+        }
+        if (targetListId && activeTaskItem.listId !== targetListId) {
+          const tasksInNewList = getTasksByListId(targetListId);
+          moveTask(activeId, targetListId, tasksInNewList.length);
+        }
+        return;
+      }
+
       // If both tasks are in the same list, reorder
-      if (overTask && activeTaskItem.listId === overTask.listId) {
+      if (activeTaskItem.listId === overTask.listId) {
         const listTasks = getTasksByListId(activeTaskItem.listId);
         const activeIndex = listTasks.findIndex((t) => t.id === activeId);
         const overIndex = listTasks.findIndex((t) => t.id === overId);
@@ -321,7 +349,7 @@ export function BoardView({ projectId, onTaskClick, filters }: BoardViewProps) {
         }
       }
     },
-    [tasks, displayLists, getTasksByListId, reorderTasks, reorderLists]
+    [tasks, displayLists, getTasksByListId, reorderTasks, reorderLists, moveTask]
   );
 
   const handleAddList = () => {
@@ -400,6 +428,7 @@ export function BoardView({ projectId, onTaskClick, filters }: BoardViewProps) {
                 projectId={projectId}
                 list={list}
                 tasks={getFilteredTasksByListId(list.id)}
+                allTasks={tasks}
                 labels={labels}
                 tags={tags}
                 onAddTask={handleAddTask(list.id)}
@@ -482,6 +511,7 @@ export function BoardView({ projectId, onTaskClick, filters }: BoardViewProps) {
             task={activeTask}
             labels={labels.filter((l) => activeTask.labelIds.includes(l.id))}
             tags={tags.filter((t) => activeTask.tagIds?.includes(t.id))}
+            allTasks={tasks}
             onClick={() => {}}
             isDragging
           />

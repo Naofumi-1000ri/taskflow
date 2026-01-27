@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getProvider, isValidProvider } from '@/lib/ai/providers';
 import { AIContext, AIMessage, AIProviderType } from '@/types/ai';
+import { getAnthropicTools, getOpenAITools, getGeminiTools } from '@/lib/ai/tools';
 
 interface ChatRequest {
   messages: AIMessage[];
@@ -9,12 +10,16 @@ interface ChatRequest {
   apiKey: string;
   model?: string;
   enableTools?: boolean;
+  // When true, this is a continuation after tool execution - AI should interpret results
+  isToolResultContinuation?: boolean;
+  // When true, use personal scope tools (cross-project)
+  isPersonalScope?: boolean;
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as ChatRequest;
-    const { messages, context, provider, apiKey, model, enableTools } = body;
+    const { messages, context, provider, apiKey, model, enableTools, isToolResultContinuation, isPersonalScope } = body;
 
     // Validate required fields
     if (!messages || !Array.isArray(messages)) {
@@ -48,6 +53,14 @@ export async function POST(request: NextRequest) {
     // Get provider and create streaming response
     const aiProvider = getProvider(provider);
 
+    // Debug: Log available tools when tools are enabled
+    if (enableTools) {
+      const anthropicTools = getAnthropicTools(isPersonalScope);
+      console.log('[AI Chat API] Tools enabled. Provider:', provider, 'Personal scope:', isPersonalScope);
+      console.log('[AI Chat API] Available tools:', anthropicTools.map(t => t.name).join(', '));
+      console.log('[AI Chat API] Tool count:', anthropicTools.length);
+    }
+
     // Create a ReadableStream for SSE
     const stream = new ReadableStream({
       async start(controller) {
@@ -62,7 +75,7 @@ export async function POST(request: NextRequest) {
             context,
             apiKey,
             model,
-            { enableTools }
+            { enableTools, isToolResultContinuation, isPersonalScope }
           );
 
           let chunkCount = 0;

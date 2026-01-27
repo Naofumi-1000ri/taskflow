@@ -1,3 +1,4 @@
+import { addDays, differenceInDays } from 'date-fns';
 import type { Task, Priority, ChecklistItem } from '@/types';
 
 const PRIORITY_ORDER: Record<Priority, number> = {
@@ -317,4 +318,131 @@ export function getBottleneckTask(task: Task, allTasks: Task[]): Task | null {
       return t.dueDate > latest.dueDate ? t : latest;
     }, null as Task | null);
   }
+}
+
+/**
+ * Effective dates interface including predicted dates from dependencies.
+ */
+export interface EffectiveDates {
+  startDate: Date | null;       // Actual/explicit start date
+  dueDate: Date | null;         // Actual/explicit due date
+  predictedStart: Date | null;  // Predicted start date from dependencies
+  predictedEnd: Date | null;    // Predicted end date (predictedStart + durationDays)
+  isPredicted: boolean;         // Whether dates are predicted (no explicit dates set)
+  isDeadlineOverdue: boolean;   // Dependency pushes start past fixed due date
+}
+
+/**
+ * Calculate effective dates for a task including predictions based on dependencies.
+ *
+ * @param task The task to calculate dates for
+ * @param allTasks All tasks in the project (for dependency lookups)
+ * @returns EffectiveDates with actual and/or predicted dates
+ */
+export function getEffectiveDates(task: Task, allTasks: Task[]): EffectiveDates {
+  const result: EffectiveDates = {
+    startDate: task.startDate,
+    dueDate: task.dueDate,
+    predictedStart: null,
+    predictedEnd: null,
+    isPredicted: false,
+    isDeadlineOverdue: false,
+  };
+
+  // If task has explicit dates, check if dependency overrides them
+  const effectiveStart = calculateEffectiveStartDate(task, allTasks);
+
+  if (effectiveStart) {
+    // Check if we need to use predicted dates
+    if (!task.startDate && !task.dueDate && task.durationDays) {
+      // No explicit dates, but has duration + dependencies -> predict
+      result.predictedStart = effectiveStart;
+      result.predictedEnd = addDays(effectiveStart, task.durationDays - 1);
+      result.isPredicted = true;
+    } else if (task.startDate && effectiveStart > task.startDate) {
+      // Dependency pushes start date forward
+      result.predictedStart = effectiveStart;
+
+      if (task.durationDays && !task.isDueDateFixed) {
+        // Duration優先: recalculate end date
+        result.predictedEnd = addDays(effectiveStart, task.durationDays - 1);
+      } else if (task.dueDate) {
+        // Fixed due date: keep original
+        result.predictedEnd = task.dueDate;
+      }
+
+      result.isPredicted = true;
+
+      // Check for deadline overdue (dependency pushes start past fixed due date)
+      if (task.isDueDateFixed && task.dueDate && effectiveStart > task.dueDate) {
+        result.isDeadlineOverdue = true;
+      }
+    }
+  } else if (!task.startDate && !task.dueDate && task.durationDays && task.dependsOnTaskIds?.length > 0) {
+    // Has dependencies but couldn't calculate effective start (deps have no dates)
+    // This case will show as "pending" in the gantt chart
+  }
+
+  return result;
+}
+
+/**
+ * Recalculate dates based on isDueDateFixed flag and input changes.
+ *
+ * @param task The current task state
+ * @param changes The changes being applied
+ * @returns Updated date values
+ */
+export function recalculateDates(
+  task: Task,
+  changes: {
+    startDate?: Date | null;
+    dueDate?: Date | null;
+    durationDays?: number | null;
+    isDueDateFixed?: boolean;
+  }
+): {
+  startDate: Date | null;
+  dueDate: Date | null;
+  durationDays: number | null;
+  isDueDateFixed: boolean;
+} {
+  const startDate = changes.startDate !== undefined ? changes.startDate : task.startDate;
+  let dueDate = changes.dueDate !== undefined ? changes.dueDate : task.dueDate;
+  let durationDays = changes.durationDays !== undefined ? changes.durationDays : task.durationDays;
+  let isDueDateFixed = changes.isDueDateFixed !== undefined ? changes.isDueDateFixed : task.isDueDateFixed;
+
+  // If due date was explicitly changed, mark as fixed
+  if (changes.dueDate !== undefined && changes.dueDate !== null) {
+    isDueDateFixed = true;
+    // Recalculate duration if we have start date
+    if (startDate) {
+      durationDays = differenceInDays(changes.dueDate, startDate) + 1;
+    }
+  }
+
+  // If duration was explicitly changed, mark as not fixed and recalculate due date
+  if (changes.durationDays !== undefined && changes.durationDays !== null) {
+    isDueDateFixed = false;
+    if (startDate) {
+      dueDate = addDays(startDate, changes.durationDays - 1);
+    }
+  }
+
+  // If start date changed and not fixed, recalculate due date
+  if (changes.startDate !== undefined && changes.startDate !== null && !isDueDateFixed && durationDays) {
+    dueDate = addDays(changes.startDate, durationDays - 1);
+  }
+
+  // If start date changed and fixed, recalculate duration
+  if (changes.startDate !== undefined && changes.startDate !== null && isDueDateFixed && dueDate) {
+    durationDays = differenceInDays(dueDate, changes.startDate) + 1;
+  }
+
+  return {
+    startDate,
+    dueDate,
+    durationDays,
+    isDueDateFixed,
+  };
 }

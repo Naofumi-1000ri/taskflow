@@ -31,6 +31,7 @@ interface BoardListProps {
   projectId: string;
   list: List;
   tasks: Task[];
+  allTasks: Task[]; // All tasks in project for dependency lookup
   labels: Label[];
   tags: Tag[];
   onAddTask: (title: string) => void;
@@ -43,6 +44,7 @@ export function BoardList({
   projectId,
   list,
   tasks,
+  allTasks,
   labels,
   tags,
   onAddTask,
@@ -264,7 +266,7 @@ export function BoardList({
       {/* Tasks */}
       <div
         ref={setDroppableNodeRef}
-        className="space-y-2 px-3 pb-3"
+        className="min-h-[40px] flex-1 space-y-2 px-3 pb-3"
       >
         <SortableContext
           items={tasks.map((t) => t.id)}
@@ -277,6 +279,7 @@ export function BoardList({
               task={task}
               labels={labels}
               tags={tags}
+              allTasks={allTasks}
               onClick={() => onTaskClick(task.id)}
             />
           ))}

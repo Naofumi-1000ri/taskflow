@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { useHotkeys } from '@/hooks/useHotkeys';
 import { SupportAIPanel } from '@/components/ai/SupportAIPanel';
+import { PersonalAIButton } from '@/components/ai/PersonalAIButton';
 import { AIContext } from '@/types/ai';
 
 export default function DashboardLayout({
@@ -34,6 +35,7 @@ export default function DashboardLayout({
 
   // Create basic AI context (full context will be provided by project pages)
   const defaultAIContext: AIContext = useMemo(() => ({
+    scope: 'project',
     project: {
       id: currentProjectId || '',
       name: 'ダッシュボード',
@@ -129,7 +131,12 @@ export default function DashboardLayout({
         </div>
         <ProjectFormModal />
         <ShortcutHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
-        <SupportAIPanel projectId={currentProjectId} context={defaultAIContext} />
+        {/* Project AI Panel for project pages, Personal AI Button for dashboard */}
+        {currentProjectId ? (
+          <SupportAIPanel projectId={currentProjectId} context={defaultAIContext} />
+        ) : (
+          <PersonalAIButton />
+        )}
       </div>
     </NotificationProvider>
   );

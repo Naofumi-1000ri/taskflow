@@ -37,6 +37,7 @@ import {
   calculateEffectiveStartDate,
   getAllDependentTasks,
   getDependencyTasks,
+  getEffectiveDates,
 } from '@/lib/utils/task';
 
 interface GanttChartProps {
@@ -219,7 +220,7 @@ export function GanttChart({
     return offset * columnWidth + columnWidth / 2;
   };
 
-  // Calculate task positions for dependency arrows
+  // Calculate task positions for dependency arrows (including predicted positions)
   const taskPositions = useMemo(() => {
     const positions: Record<string, {
       row: number;
@@ -228,24 +229,49 @@ export function GanttChart({
       bar: TaskBarResult;
       endDate: Date | null;
       startDate: Date | null;
+      isPredicted: boolean;
+      isDeadlineOverdue: boolean;
+      effectiveDates: ReturnType<typeof getEffectiveDates>;
     }> = {};
     filteredTasks.forEach((task, index) => {
-      const bar = calculateTaskBar(task, rangeStart, viewMode, columnWidth);
+      const effectiveDates = getEffectiveDates(task, tasks);
+
+      // Try to calculate bar from explicit dates first
+      let bar = calculateTaskBar(task, rangeStart, viewMode, columnWidth);
+      let isPredicted = false;
+      let actualStartDate = task.startDate;
+      let actualEndDate = task.isCompleted && task.completedAt ? task.completedAt : task.dueDate;
+
+      // If no explicit bar but we have predicted dates, create a predicted bar
+      if (!bar && effectiveDates.isPredicted && effectiveDates.predictedStart && effectiveDates.predictedEnd) {
+        // Create a temporary task-like object for bar calculation
+        const predictedTask = {
+          ...task,
+          startDate: effectiveDates.predictedStart,
+          dueDate: effectiveDates.predictedEnd,
+        };
+        bar = calculateTaskBar(predictedTask, rangeStart, viewMode, columnWidth);
+        isPredicted = true;
+        actualStartDate = effectiveDates.predictedStart;
+        actualEndDate = effectiveDates.predictedEnd;
+      }
+
       if (bar) {
-        // Determine the actual end date (completedAt for completed tasks, dueDate otherwise)
-        const endDate = task.isCompleted && task.completedAt ? task.completedAt : task.dueDate;
         positions[task.id] = {
           row: index,
           barStart: bar.start,
           barEnd: bar.start + bar.width,
           bar,
-          endDate,
-          startDate: task.startDate,
+          endDate: actualEndDate,
+          startDate: actualStartDate,
+          isPredicted,
+          isDeadlineOverdue: effectiveDates.isDeadlineOverdue,
+          effectiveDates,
         };
       }
     });
     return positions;
-  }, [filteredTasks, rangeStart, viewMode, columnWidth]);
+  }, [filteredTasks, tasks, rangeStart, viewMode, columnWidth]);
 
   // Extract dependencies for arrow rendering (only for visible tasks)
   const dependencies = useMemo(() => {
@@ -906,7 +932,11 @@ export function GanttChart({
 
               {/* Task Bars */}
               {filteredTasks.map((task, index) => {
-                const bar = taskPositions[task.id]?.bar;
+                const position = taskPositions[task.id];
+                const bar = position?.bar;
+                const isPredicted = position?.isPredicted ?? false;
+                const isDeadlineOverdue = position?.isDeadlineOverdue ?? false;
+                const effectiveDates = position?.effectiveDates;
                 const isDragging = dragState?.taskId === task.id;
                 const displayBar = isDragging && dragPreview
                   ? { ...bar!, start: dragPreview.left, width: dragPreview.width }
@@ -938,27 +968,40 @@ export function GanttChart({
                             'group absolute top-2 z-10 flex h-6 items-center rounded text-xs text-white shadow-sm',
                             task.isCompleted
                               ? 'cursor-pointer'
-                              : 'cursor-move',
-                            isDragging && 'opacity-80 ring-2 ring-primary ring-offset-1'
+                              : isPredicted
+                                ? 'cursor-default'
+                                : 'cursor-move',
+                            isDragging && 'opacity-80 ring-2 ring-primary ring-offset-1',
+                            isPredicted && 'border-2 border-dashed'
                           )}
                           style={{
                             left: displayBar.start,
                             width: Math.max(displayBar.width, 24),
-                            backgroundColor: bar?.isLate
-                              ? '#ef4444' // 遅延は赤
-                              : task.isCompleted
-                                ? '#22c55e' // 完了は緑
-                                : listColors[task.listId] || '#6b7280',
+                            backgroundColor: isDeadlineOverdue
+                              ? '#dc2626' // 期限オーバーは赤
+                              : bar?.isLate
+                                ? '#ef4444' // 遅延は赤
+                                : task.isCompleted
+                                  ? '#22c55e' // 完了は緑
+                                  : isPredicted
+                                    ? 'transparent' // 予測バーは透明背景
+                                    : listColors[task.listId] || '#6b7280',
+                            borderColor: isPredicted
+                              ? (isDeadlineOverdue ? '#dc2626' : listColors[task.listId] || '#6b7280')
+                              : undefined,
+                            color: isPredicted
+                              ? (isDeadlineOverdue ? '#dc2626' : listColors[task.listId] || '#6b7280')
+                              : undefined,
                           }}
                           onClick={() => !isDragging && !justDraggedRef.current && onTaskClick?.(task.id)}
                           onMouseDown={(e) => {
-                            if (!task.isCompleted && bar) {
+                            if (!task.isCompleted && !isPredicted && bar) {
                               handleDragStart(e, task, 'move', bar.start, bar.width);
                             }
                           }}
                         >
                           {/* Left resize handle */}
-                          {!task.isCompleted && (
+                          {!task.isCompleted && !isPredicted && (
                             <div
                               className="absolute left-0 top-0 z-20 h-full w-2 cursor-ew-resize opacity-0 group-hover:opacity-100"
                               style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
@@ -975,15 +1018,24 @@ export function GanttChart({
                               <Check className="h-3 w-3 flex-shrink-0" />
                             )}
                             <span className="truncate">
-                              {formatTaskDate(task.startDate)} -{' '}
-                              {task.isCompleted && task.completedAt
-                                ? formatTaskDate(task.completedAt)
-                                : formatTaskDate(task.dueDate)}
+                              {isPredicted ? (
+                                <>
+                                  予測: {effectiveDates?.predictedStart ? formatTaskDate(effectiveDates.predictedStart) : '-'} -{' '}
+                                  {effectiveDates?.predictedEnd ? formatTaskDate(effectiveDates.predictedEnd) : '-'}
+                                </>
+                              ) : (
+                                <>
+                                  {formatTaskDate(task.startDate)} -{' '}
+                                  {task.isCompleted && task.completedAt
+                                    ? formatTaskDate(task.completedAt)
+                                    : formatTaskDate(task.dueDate)}
+                                </>
+                              )}
                             </span>
                           </div>
 
                           {/* Right resize handle */}
-                          {!task.isCompleted && (
+                          {!task.isCompleted && !isPredicted && (
                             <div
                               className="absolute right-0 top-0 z-20 h-full w-2 cursor-ew-resize opacity-0 group-hover:opacity-100"
                               style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}

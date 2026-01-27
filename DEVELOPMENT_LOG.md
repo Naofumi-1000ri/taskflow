@@ -252,11 +252,260 @@ npm run test:e2e
    - 要望: Jooto風の縦長レイアウト、タブ廃止
    - 解決: タブを削除し、チェックリストとコメントを詳細内に直接表示
 
+### 11. AIアシスタント機能
+
+**指示**: プロジェクト内AIアシスタント機能の実装
+
+**実装内容**:
+- `/src/lib/ai/tools/` - AI Function Calling用ツール
+  - `createTask.ts` - タスク作成ツール
+  - `updateTask.ts` - タスク更新ツール
+  - `deleteTask.ts` - タスク削除ツール
+  - `taskTools.ts` - タスク操作（完了、移動、担当者設定）
+  - `queryTasks.ts` - タスク取得ツール（一覧、詳細、マイタスク、期限切れ）
+  - `projectQueries.ts` - プロジェクト情報取得ツール（リスト、メンバー、ラベル）
+  - `scheduleAnalysis.ts` - スケジュール分析ツール
+  - `planGeneration.ts` - タスク計画生成ツール
+  - `qualityAssistance.ts` - 品質改善提案ツール
+- `/src/lib/ai/providers/` - AIプロバイダー連携
+  - `anthropic.ts` - Anthropic Claude API
+  - `openai.ts` - OpenAI GPT API
+  - `gemini.ts` - Google Gemini API
+- `/src/components/ai/SupportAIPanel.tsx` - AIパネルコンポーネント
+- `/src/hooks/useConversation.ts` - 会話管理フック
+- `/src/stores/aiSettingsStore.ts` - AI設定ストア
+- マルチプロバイダー対応（OpenAI, Anthropic, Gemini）
+- Function Callingによるタスク操作
+- 会話履歴の永続化（Firestore）
+- ストリーミングレスポンス
+
+### 12. パーソナルAIアシスタント
+
+**指示**: ダッシュボードレベルで動作する個人AIアシスタントを追加。参加している全プロジェクトを横断して、作業優先順位の相談や日報生成ができる。
+
+**実装内容**:
+
+#### 個人AI用ツール（4種類）
+- `/src/lib/ai/tools/personalTools.ts`
+  - `get_my_tasks_across_projects` - 全プロジェクトを横断して自分のタスクを取得
+  - `get_workload_summary` - ワークロード分析（期限切れ、今日/今週期限、プロジェクト別負荷）
+  - `suggest_work_priority` - 作業優先順位の提案（期限、優先度、依存関係、ブロック状態を考慮）
+  - `generate_daily_report` - 日報生成（完了/進行中/ブロック中タスク、マークダウン形式出力）
+
+#### 型定義の拡張
+- `/src/lib/ai/tools/types.ts`
+  - `AIScope` 型追加 (`'project' | 'personal'`)
+  - `ToolExecutionContext` に `scope`, `projectIds` を追加
+- `/src/types/ai.ts`
+  - `AIScope` 型追加
+  - `AIConversation` に `scope` フィールド追加
+  - `AIContext` に `projects` 配列追加（個人スコープ用）
+
+#### 個人会話ストレージ
+- `/src/lib/ai/conversationStorage.ts` - 個人会話用関数を追加
+  - 保存先: `users/{userId}/personalConversations/{conversationId}`
+  - `createPersonalConversation()`
+  - `updatePersonalConversationTitle()`
+  - `deletePersonalConversation()`
+  - `getPersonalConversations()`
+  - `subscribeToPersonalConversations()`
+  - `addPersonalMessage()`
+  - `getPersonalMessages()`
+  - `subscribeToPersonalMessages()`
+
+#### 個人AIコンポーネント
+- `/src/components/ai/PersonalAIButton.tsx` - フローティングAIボタン
+  - 画面右下に配置
+  - クリックで展開→チャットパネル（420x600px）
+  - クイックアクション: 「今日の優先順位」「日報生成」「負荷確認」
+  - 会話履歴サイドバー
+  - ESCまたは外クリックで閉じる
+  - 展開状態をlocalStorageで記憶
+
+#### 個人会話フック
+- `/src/hooks/usePersonalConversations.ts` - 個人会話リスト管理
+- `/src/hooks/usePersonalConversation.ts` - 個人会話メッセージング
+
+#### レイアウト更新
+- `/src/app/(dashboard)/layout.tsx`
+  - プロジェクトページでは `SupportAIPanel` を表示
+  - ダッシュボード（非プロジェクトページ）では `PersonalAIButton` を表示
+
+#### AIプロバイダー更新
+- 全プロバイダー（Anthropic, OpenAI, Gemini）を更新
+  - `isPersonalScope` パラメータ対応
+  - 個人スコープ用システムプロンプト追加
+  - 個人ツール読み込み対応
+
+---
+
+## ファイル構成
+
+```
+src/
+├── app/
+│   ├── (auth)/
+│   │   ├── layout.tsx
+│   │   └── login/page.tsx
+│   ├── (dashboard)/
+│   │   ├── layout.tsx
+│   │   ├── page.tsx                    # ダッシュボード
+│   │   └── projects/
+│   │       ├── page.tsx                # プロジェクト一覧
+│   │       └── [projectId]/
+│   │           ├── layout.tsx
+│   │           ├── board/page.tsx      # カンバンボード
+│   │           ├── gantt/page.tsx      # ガントチャート
+│   │           └── settings/page.tsx   # プロジェクト設定
+│   ├── api/
+│   │   └── ai/
+│   │       └── chat/route.ts           # AI Chat API
+│   ├── globals.css
+│   └── layout.tsx
+├── components/
+│   ├── ai/
+│   │   ├── SupportAIPanel.tsx          # プロジェクトAIパネル
+│   │   ├── PersonalAIButton.tsx        # 個人AIフローティングボタン
+│   │   ├── ChatInput.tsx
+│   │   ├── ChatMessage.tsx
+│   │   ├── ConversationList.tsx
+│   │   └── ToolConfirmDialog.tsx
+│   ├── board/
+│   │   ├── BoardView.tsx
+│   │   ├── BoardList.tsx
+│   │   └── TaskCard.tsx
+│   ├── common/
+│   │   ├── Header.tsx
+│   │   └── Sidebar.tsx
+│   ├── gantt/
+│   │   └── GanttChart.tsx
+│   ├── project/
+│   │   ├── ProjectCard.tsx
+│   │   └── ProjectFormModal.tsx
+│   ├── providers/
+│   │   ├── AuthProvider.tsx
+│   │   ├── QueryProvider.tsx
+│   │   └── index.tsx
+│   ├── task/
+│   │   ├── TaskDetailModal.tsx
+│   │   ├── ChecklistSection.tsx
+│   │   ├── CommentSection.tsx
+│   │   └── AttachmentSection.tsx
+│   └── ui/                             # shadcn/ui コンポーネント
+├── hooks/
+│   ├── useAuth.ts
+│   ├── useBoard.ts
+│   ├── useProjects.ts
+│   ├── useTaskDetails.ts
+│   ├── useConversation.ts              # プロジェクトAI会話
+│   ├── useAIConversations.ts
+│   ├── usePersonalConversation.ts      # 個人AI会話
+│   └── usePersonalConversations.ts
+├── lib/
+│   ├── ai/
+│   │   ├── conversationStorage.ts      # 会話ストレージ（プロジェクト＋個人）
+│   │   ├── contextBuilder.ts
+│   │   ├── toolExecutor.ts
+│   │   ├── providers/
+│   │   │   ├── types.ts
+│   │   │   ├── index.ts
+│   │   │   ├── anthropic.ts
+│   │   │   ├── openai.ts
+│   │   │   └── gemini.ts
+│   │   └── tools/
+│   │       ├── types.ts
+│   │       ├── index.ts
+│   │       ├── createTask.ts
+│   │       ├── updateTask.ts
+│   │       ├── deleteTask.ts
+│   │       ├── taskTools.ts
+│   │       ├── queryTasks.ts
+│   │       ├── projectQueries.ts
+│   │       ├── scheduleAnalysis.ts
+│   │       ├── planGeneration.ts
+│   │       ├── qualityAssistance.ts
+│   │       └── personalTools.ts        # 個人AI用ツール
+│   ├── firebase/
+│   │   ├── auth.ts
+│   │   ├── config.ts
+│   │   ├── firestore.ts
+│   │   └── storage.ts
+│   ├── utils.ts
+│   └── utils/
+│       ├── gantt.ts
+│       └── task.ts
+├── stores/
+│   ├── authStore.ts
+│   ├── uiStore.ts
+│   └── aiSettingsStore.ts
+└── types/
+    ├── index.ts
+    └── ai.ts                           # AI関連型定義
+```
+
+---
+
+## 必要なFirebase設定
+
+### Firestoreセキュリティルール
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+```
+
+### 必要なFirestoreインデックス
+
+- `projects` コレクション:
+  - `memberIds` (Arrays) + `isArchived` (Ascending) + `updatedAt` (Descending)
+
+---
+
+## コマンド
+
+```bash
+# 開発サーバー起動
+npm run dev
+
+# ビルド
+npm run build
+
+# ユニットテスト
+npm run test
+
+# E2Eテスト
+npm run test:e2e
+```
+
+---
+
+## 解決した問題
+
+1. **「プロジェクトがみつかりません」エラー**
+   - 原因: サイドバーのハードコードされたモックデータ
+   - 解決: `useProjects` フックで実際のFirestoreデータを取得
+
+2. **「client is offline」エラー**
+   - 原因: Firestoreデータベース未作成、インデックス未作成
+   - 解決: Firestoreデータベース作成、複合インデックス作成、オフライン永続化の有効化
+
+3. **タスク詳細のUI改善**
+   - 要望: Jooto風の縦長レイアウト、タブ廃止
+   - 解決: タブを削除し、チェックリストとコメントを詳細内に直接表示
+
 ---
 
 ## 今後の拡張案
 
-- [ ] 担当者アサイン機能
+- [x] 担当者アサイン機能
+- [x] AIアシスタント機能（プロジェクト単位）
+- [x] パーソナルAIアシスタント（全プロジェクト横断）
 - [ ] 通知機能
 - [ ] ファイル添付のプレビュー
 - [ ] タスクのフィルター・検索

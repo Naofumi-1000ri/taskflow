@@ -10,17 +10,31 @@ export interface AIProviderConfig {
 // Message types
 export interface AIMessage {
   id: string;
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   createdAt: Date;
+  // For assistant messages with tool calls
+  toolCalls?: Array<{
+    id: string;
+    name: string;
+    arguments: Record<string, unknown>;
+    // Gemini 3: thought signature for function calls (required for tool responses)
+    thoughtSignature?: string;
+  }>;
+  // For tool result messages
+  toolCallId?: string;
+  toolName?: string; // Function name for the tool result (needed by Gemini)
+  // Gemini 3: thought signature must be returned with function response
+  thoughtSignature?: string;
 }
 
 // Conversation types
 export interface AIConversation {
   id: string;
-  projectId: string;
+  projectId: string;    // For project scope, empty for personal
+  scope: AIScope;       // 'project' or 'personal'
   title: string;
-  contextType: 'task' | 'project' | null;
+  contextType: 'task' | 'project' | 'personal' | null;
   contextId: string | null;
   createdBy: string;
   createdAt: Date;
@@ -65,13 +79,19 @@ export interface AIProjectContext {
   }>;
 }
 
+// AI Scope type
+export type AIScope = 'project' | 'personal';
+
 export interface AIContext {
+  scope: AIScope;
   task?: AITaskContext;
-  project: AIProjectContext;
+  project?: AIProjectContext;      // For project scope
+  projects?: AIProjectContext[];   // For personal scope (all user's projects)
   user: {
     id: string;
     displayName: string;
   };
+  currentHour?: number; // クライアント側の現在時刻（時間帯対応プロンプト用）
 }
 
 // Chat request/response types
@@ -104,7 +124,7 @@ export interface AISettings {
 export const DEFAULT_MODELS: Record<AIProviderType, string> = {
   openai: 'gpt-4o',
   anthropic: 'claude-sonnet-4-20250514',
-  gemini: 'gemini-2.0-flash',
+  gemini: 'gemini-3-flash-preview',
 };
 
 // Provider display names

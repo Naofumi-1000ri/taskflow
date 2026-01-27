@@ -3,6 +3,75 @@ import { AIProvider, StreamChunk, SendMessageOptions } from './types';
 import { getAnthropicTools } from '../tools';
 import { ToolCall } from '../tools/types';
 
+/**
+ * Convert AIMessage array to Anthropic message format
+ * Handles tool_use (assistant) and tool_result (user) messages
+ */
+function convertMessagesToAnthropic(messages: AIMessage[]): Array<{
+  role: 'user' | 'assistant';
+  content: string | Array<Record<string, unknown>>;
+}> {
+  const result: Array<{
+    role: 'user' | 'assistant';
+    content: string | Array<Record<string, unknown>>;
+  }> = [];
+
+  for (const msg of messages) {
+    if (msg.role === 'assistant') {
+      // Check if this is an assistant message with tool calls
+      if (msg.toolCalls && msg.toolCalls.length > 0) {
+        const contentBlocks: Array<Record<string, unknown>> = [];
+
+        // Add text content if present
+        if (msg.content) {
+          contentBlocks.push({ type: 'text', text: msg.content });
+        }
+
+        // Add tool_use blocks
+        for (const toolCall of msg.toolCalls) {
+          contentBlocks.push({
+            type: 'tool_use',
+            id: toolCall.id,
+            name: toolCall.name,
+            input: toolCall.arguments,
+          });
+        }
+
+        result.push({
+          role: 'assistant',
+          content: contentBlocks,
+        });
+      } else {
+        // Regular text-only assistant message
+        result.push({
+          role: 'assistant',
+          content: msg.content,
+        });
+      }
+    } else if (msg.role === 'tool') {
+      // Tool result message - becomes a user message with tool_result content
+      result.push({
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: msg.toolCallId,
+            content: msg.content,
+          },
+        ],
+      });
+    } else {
+      // User or system message
+      result.push({
+        role: 'user',
+        content: msg.content,
+      });
+    }
+  }
+
+  return result;
+}
+
 export class AnthropicProvider implements AIProvider {
   name = 'anthropic' as const;
 
@@ -13,23 +82,28 @@ export class AnthropicProvider implements AIProvider {
     model?: string,
     options?: SendMessageOptions
   ): AsyncGenerator<StreamChunk, void, unknown> {
-    const systemPrompt = buildSystemPrompt(context, options?.enableTools);
+    const systemPrompt = buildSystemPrompt(context, options?.enableTools && !options?.isToolResultContinuation, options?.isPersonalScope);
     const modelToUse = model || DEFAULT_MODELS.anthropic;
+
+    // Convert messages to Anthropic format (handles tool_use and tool_result)
+    const anthropicMessages = convertMessagesToAnthropic(messages);
 
     const requestBody: Record<string, unknown> = {
       model: modelToUse,
       max_tokens: 4096,
       system: systemPrompt,
-      messages: messages.map((m) => ({
-        role: m.role === 'assistant' ? 'assistant' : 'user',
-        content: m.content,
-      })),
+      messages: anthropicMessages,
       stream: true,
     };
 
-    // Add tools if enabled
+    // Add tools if enabled - allow chained tool calls for multi-step operations
     if (options?.enableTools) {
-      requestBody.tools = getAnthropicTools();
+      const tools = getAnthropicTools(options?.isPersonalScope);
+      requestBody.tools = tools;
+      // Force tool use for better compliance
+      requestBody.tool_choice = { type: 'auto' };
+      console.log('[Anthropic] Adding tools to request:', tools.map(t => t.name).join(', '), 'Personal scope:', options?.isPersonalScope);
+      console.log('[Anthropic] Tool count:', tools.length);
     }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -130,20 +204,71 @@ export class AnthropicProvider implements AIProvider {
   }
 }
 
-function buildSystemPrompt(context: AIContext, enableTools?: boolean): string {
-  let prompt = `あなたはタスク管理アプリ「TaskFlow」のサポートAIアシスタントです。
-ユーザーのタスク管理や質問に対して、親切で的確なサポートを提供してください。
+function buildSystemPrompt(context: AIContext, enableTools?: boolean, isPersonalScope?: boolean): string {
+  // Personal scope has different system prompt
+  if (isPersonalScope) {
+    return buildPersonalSystemPrompt(context, enableTools);
+  }
 
+  let prompt = `あなたはタスク管理アプリ「TaskFlow」のサポートAIアシスタントです。
+`;
+
+  // Put tool instructions FIRST if enabled
+  if (enableTools) {
+    prompt += `
+## 最重要ルール - ツールの使用
+
+あなたには複数のツールが提供されています。**ユーザーに何かを聞き返す前に、必ずツールを使って情報を取得してください。**
+
+### 絶対禁止事項
+- 「リストIDを教えてください」と聞く → 代わりに get_lists を呼ぶ
+- 「どのタスクですか？」と聞く → 代わりに get_tasks を呼ぶ
+- 「メンバーIDが必要です」と言う → 代わりに get_members を呼ぶ
+
+### 操作の手順
+1. 「〜リストにタスク追加して」と言われたら:
+   - まず get_lists を呼んでリストIDを取得
+   - 取得したIDで create_task を呼ぶ
+
+2. 「〜さんに担当を設定して」と言われたら:
+   - まず get_members を呼んでメンバーIDを取得
+   - 取得したIDで assign_task を呼ぶ
+
+### ツール一覧
+- get_lists: リスト一覧を取得（order=0が一番左）
+- get_members: メンバー一覧を取得
+- get_labels: ラベル一覧を取得
+- get_tasks: タスク一覧を取得
+- get_project_summary: プロジェクト概要を取得
+- create_task: タスクを作成
+- update_task: タスクを更新
+- delete_task: タスクを削除
+- complete_task: タスクを完了
+- move_task: タスクを移動
+- assign_task: 担当者を設定
+
+`;
+  }
+
+  // Get today's date
+  const today = new Date();
+  const todayISO = today.toISOString().split('T')[0];
+
+  prompt += `
 ## 現在のコンテキスト
+
+### 日付情報
+- 今日の日付: ${todayISO}
+- 「今日から」「本日から」と言われた場合は ${todayISO} を開始日として使用してください
 
 ### ユーザー情報
 - 名前: ${context.user.displayName}
 
 ### プロジェクト情報
-- プロジェクト名: ${context.project.name}
-- 説明: ${context.project.description || 'なし'}
-- リスト: ${context.project.lists.map((l) => `${l.name}(${l.taskCount}件)`).join(', ')}
-- メンバー: ${context.project.members.map((m) => m.displayName).join(', ')}
+- プロジェクト名: ${context.project?.name || 'なし'}
+- 説明: ${context.project?.description || 'なし'}
+- リスト: ${context.project?.lists.map((l) => `${l.name}(${l.taskCount}件)`).join(', ') || 'なし'}
+- メンバー: ${context.project?.members.map((m) => m.displayName).join(', ') || 'なし'}
 `;
 
   if (context.task) {
@@ -183,13 +308,119 @@ function buildSystemPrompt(context: AIContext, enableTools?: boolean): string {
 - 必要に応じてタスクの分解や優先順位付けの提案をしてください
 `;
 
+  return prompt;
+}
+
+/**
+ * Build system prompt for personal (cross-project) scope
+ */
+function getTimePeriodLabel(hour: number): string {
+  if (hour >= 5 && hour <= 11) return '朝';
+  if (hour >= 12 && hour <= 16) return '午後';
+  if (hour >= 17 && hour <= 23) return '夕方';
+  return '深夜';
+}
+
+function getTimePeriodInstructions(hour: number): string {
+  if (hour >= 5 && hour <= 11) {
+    return `- 元気で前向きな挨拶をしてください
+- タスクの整理と優先順位付けを積極的に提案してください
+- 期限切れや本日期限のタスクがあれば注意喚起してください
+- 「今日も一緒に頑張りましょう！」のような前向きな締めくくりを`;
+  }
+  if (hour >= 12 && hour <= 16) {
+    return `- 午後の進捗を気遣ってください
+- 負荷が高そうなら休憩や優先順位の見直しを提案してください
+- 残りの時間で取り組むべきタスクを整理してください`;
+  }
+  if (hour >= 17 && hour <= 23) {
+    return `- 「お疲れ様です」とねぎらいの言葉から始めてください
+- 日報作成を積極的にサポートしてください
+- 今日の成果を振り返り、達成を認めてください
+- 明日への引き継ぎ事項があれば整理してください`;
+  }
+  return `- 遅い時間の作業をねぎらってください
+- 簡潔にサポートしてください
+- 体調を気遣い、無理しないよう声をかけてください`;
+}
+
+function buildPersonalSystemPrompt(context: AIContext, enableTools?: boolean): string {
+  const currentHour = context.currentHour ?? new Date().getHours();
+  const timePeriodLabel = getTimePeriodLabel(currentHour);
+
+  let prompt = `あなたは「相棒」— ${context.user.displayName}さんの個人タスク管理パートナーです。
+
+## あなたの性格
+- 親しみやすく温かい口調（丁寧なカジュアル体）
+- パートナーとして一緒に仕事を進める姿勢
+- 努力を認め、適度に励ます
+- 問題は一緒に考える
+
+## 現在の時間帯: ${timePeriodLabel}
+${getTimePeriodInstructions(currentHour)}
+
+## 役割
+1. **朝の計画**: タスク整理、優先順位付け、一日の目標設定
+2. **日中のサポート**: 進捗確認、優先順位調整、困りごとの相談
+3. **夕方の振り返り**: 日報生成、成果の振り返り、明日の準備
+`;
+
   if (enableTools) {
     prompt += `
 ## ツールの使用
-ユーザーが「〜したい」「〜を作成して」などと言った場合は、create_taskまたはcreate_tasksツールを使用してタスクを作成してください。
-複数のタスクを作成する場合はcreate_tasksを使用してください。
+
+あなたには4つのツールが提供されています。積極的にツールを使って情報を取得し、ユーザーに分かりやすく提示してください。
+
+### ツール一覧
+- get_my_tasks_across_projects: 全プロジェクトを横断して自分のタスクを取得
+- get_workload_summary: ワークロードのサマリーを取得（期限切れ、今日期限、優先度などを分析）
+- suggest_work_priority: 作業優先順位を提案（期限や依存関係を考慮）
+- generate_daily_report: 日報を生成（完了タスク、進行中タスク、ブロック中タスクをまとめる）
+
+### 使い方の例
+- 「今日何をすればいい？」→ suggest_work_priority を呼ぶ
+- 「日報を作って」→ generate_daily_report を呼ぶ
+- 「タスクを確認したい」→ get_my_tasks_across_projects を呼ぶ
+- 「負荷はどうなってる？」→ get_workload_summary を呼ぶ
+
 `;
   }
+
+  // Get today's date
+  const today = new Date();
+  const todayISO = today.toISOString().split('T')[0];
+
+  prompt += `
+## 現在のコンテキスト
+
+### 日付情報
+- 今日の日付: ${todayISO}
+
+### ユーザー情報
+- 名前: ${context.user.displayName}
+`;
+
+  // List all projects
+  if (context.projects && context.projects.length > 0) {
+    prompt += `
+### 参加プロジェクト（${context.projects.length}件）
+`;
+    for (const project of context.projects) {
+      prompt += `- ${project.name}`;
+      if (project.description) {
+        prompt += `: ${project.description}`;
+      }
+      prompt += '\n';
+    }
+  }
+
+  prompt += `
+## 回答のガイドライン
+- 日本語で回答してください
+- 簡潔で分かりやすい回答を心がけてください
+- プロジェクト横断で優先順位や作業負荷を分析してください
+- 日報やサマリーを出力する際は、マークダウン形式で見やすく整形してください
+`;
 
   return prompt;
 }

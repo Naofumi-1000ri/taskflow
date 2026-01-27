@@ -54,6 +54,7 @@ import {
   AlertCircle,
   Lock,
   Copy,
+  Clock,
 } from 'lucide-react';
 import { formatFileSize, getFileIcon } from '@/lib/firebase/storage';
 import { cn, linkifyText } from '@/lib/utils';
@@ -63,6 +64,8 @@ import {
   getDependencyTasks,
   isTaskBlocked,
   getBottleneckTask,
+  recalculateDates,
+  getEffectiveDates,
 } from '@/lib/utils/task';
 import { useTaskDetails } from '@/hooks/useTaskDetails';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -120,6 +123,7 @@ export function TaskDetailModal({
   const [priority, setPriority] = useState<Priority | null>(null);
   const [dueDate, setDueDate] = useState<Date | undefined>();
   const [startDate, setStartDate] = useState<Date | undefined>();
+  const [durationDays, setDurationDays] = useState<number | null>(null);
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [isCompleted, setIsCompleted] = useState(false);
   const [completedAt, setCompletedAt] = useState<Date | undefined>();
@@ -183,6 +187,7 @@ export function TaskDetailModal({
         setPriority(task.priority);
         setDueDate(task.dueDate || undefined);
         setStartDate(task.startDate || undefined);
+        setDurationDays(task.durationDays);
         setSelectedLabelIds(task.labelIds);
         setIsCompleted(task.isCompleted);
         setCompletedAt(task.completedAt || undefined);
@@ -600,13 +605,84 @@ export function TaskDetailModal({
                         mode="single"
                         selected={dueDate}
                         onSelect={(date) => {
-                          setDueDate(date);
-                          onUpdate({ dueDate: date || null });
+                          if (task && date) {
+                            // Use recalculateDates to properly update duration
+                            const result = recalculateDates(task, { dueDate: date });
+                            setDueDate(date);
+                            setDurationDays(result.durationDays);
+                            onUpdate({
+                              dueDate: date,
+                              durationDays: result.durationDays,
+                              isDueDateFixed: true,
+                            });
+                          } else {
+                            setDueDate(date || undefined);
+                            onUpdate({ dueDate: date || null });
+                          }
                         }}
                       />
                     </PopoverContent>
                   </Popover>
                 </div>
+
+                {/* Duration Days */}
+                <div className="flex items-center gap-3 py-2 text-sm">
+                  <Clock className="h-5 w-5 text-muted-foreground" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">必要日数:</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={durationDays ?? ''}
+                      onChange={(e) => {
+                        const value = e.target.value ? parseInt(e.target.value, 10) : null;
+                        setDurationDays(value);
+                      }}
+                      onBlur={(e) => {
+                        const value = e.target.value ? parseInt(e.target.value, 10) : null;
+                        if (task && value && value > 0) {
+                          // Use recalculateDates to properly update dueDate
+                          const result = recalculateDates(task, { durationDays: value });
+                          setDueDate(result.dueDate || undefined);
+                          onUpdate({
+                            durationDays: value,
+                            dueDate: result.dueDate,
+                            isDueDateFixed: false,
+                          });
+                        } else if (value === null) {
+                          onUpdate({ durationDays: null });
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                          (e.target as HTMLInputElement).blur();
+                        }
+                      }}
+                      placeholder="日数"
+                      className="h-7 w-20"
+                    />
+                    <span className="text-muted-foreground">日</span>
+                    {task?.isDueDateFixed && (
+                      <Badge variant="outline" className="text-[10px] h-5">
+                        期限固定
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                {/* Deadline Overdue Warning */}
+                {task && (() => {
+                  const effectiveDates = getEffectiveDates(task, allTasks);
+                  if (effectiveDates.isDeadlineOverdue) {
+                    return (
+                      <div className="flex items-center gap-2 rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>依存タスクの遅延により、開始日が期限を超過しています</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
 
                 {/* Dependencies */}
                 <div className="flex items-start gap-3 py-2 text-sm">

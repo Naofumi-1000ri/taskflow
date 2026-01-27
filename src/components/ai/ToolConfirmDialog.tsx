@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ToolCall } from '@/lib/ai/tools/types';
 import { getToolCallsDescription } from '@/lib/ai/toolExecutor';
-import { CheckCircle2, ListTodo, Loader2 } from 'lucide-react';
+import { CheckCircle2, ListTodo, Loader2, Edit, Trash2, Move } from 'lucide-react';
 
 interface ToolConfirmDialogProps {
   open: boolean;
@@ -20,6 +20,50 @@ interface ToolConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   isExecuting?: boolean;
+}
+
+// Get appropriate title and description based on tool types
+function getDialogContent(toolCalls: ToolCall[]) {
+  const hasCreate = toolCalls.some((t) => t.name.startsWith('create'));
+  const hasDelete = toolCalls.some((t) => t.name.startsWith('delete'));
+  const hasUpdate = toolCalls.some((t) => t.name.startsWith('update') || t.name.startsWith('complete') || t.name.startsWith('assign'));
+  const hasMove = toolCalls.some((t) => t.name.startsWith('move'));
+
+  if (hasDelete) {
+    return {
+      icon: Trash2,
+      title: '削除しますか？',
+      description: 'AIが以下の操作を実行しようとしています。',
+      confirmText: '削除する',
+      executingText: '削除中...',
+    };
+  }
+  if (hasCreate && !hasUpdate && !hasMove) {
+    return {
+      icon: ListTodo,
+      title: 'タスクを作成しますか？',
+      description: `AIが以下の${toolCalls.length > 1 ? `${toolCalls.length}件の` : ''}タスクを作成しようとしています。`,
+      confirmText: '作成する',
+      executingText: '作成中...',
+    };
+  }
+  if (hasMove) {
+    return {
+      icon: Move,
+      title: 'タスクを移動しますか？',
+      description: 'AIが以下の操作を実行しようとしています。',
+      confirmText: '移動する',
+      executingText: '移動中...',
+    };
+  }
+  // Default for update/edit operations
+  return {
+    icon: Edit,
+    title: '操作を実行しますか？',
+    description: 'AIが以下の操作を実行しようとしています。',
+    confirmText: '実行する',
+    executingText: '実行中...',
+  };
 }
 
 export function ToolConfirmDialog({
@@ -31,18 +75,18 @@ export function ToolConfirmDialog({
   isExecuting = false,
 }: ToolConfirmDialogProps) {
   const descriptions = getToolCallsDescription(toolCalls);
-  const taskCount = toolCalls.length;
+  const { icon: Icon, title, description, confirmText, executingText } = getDialogContent(toolCalls);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={!isExecuting}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ListTodo className="h-5 w-5" />
-            タスクを作成しますか？
+            <Icon className="h-5 w-5" />
+            {title}
           </DialogTitle>
           <DialogDescription>
-            AIが以下の{taskCount > 1 ? `${taskCount}件の` : ''}タスクを作成しようとしています。
+            {description}
           </DialogDescription>
         </DialogHeader>
 
@@ -75,10 +119,10 @@ export function ToolConfirmDialog({
             {isExecuting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                作成中...
+                {executingText}
               </>
             ) : (
-              <>作成する</>
+              <>{confirmText}</>
             )}
           </Button>
         </DialogFooter>

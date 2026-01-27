@@ -81,7 +81,7 @@ export function buildTaskContext(task: {
 }
 
 /**
- * Build full AI context
+ * Build full AI context for project scope
  */
 export function buildAIContext(options: {
   user: { id: string; displayName: string };
@@ -89,11 +89,29 @@ export function buildAIContext(options: {
   task?: Parameters<typeof buildTaskContext>[0];
 }): AIContext {
   return {
+    scope: 'project',
     user: {
       id: options.user.id,
       displayName: options.user.displayName,
     },
     project: buildProjectContext(options.project),
     task: options.task ? buildTaskContext(options.task) : undefined,
+  };
+}
+
+/**
+ * Build full AI context for personal (cross-project) scope
+ */
+export function buildPersonalAIContext(options: {
+  user: { id: string; displayName: string };
+  projects: Array<Parameters<typeof buildProjectContext>[0]>;
+}): AIContext {
+  return {
+    scope: 'personal',
+    user: {
+      id: options.user.id,
+      displayName: options.user.displayName,
+    },
+    projects: options.projects.map(buildProjectContext),
   };
 }

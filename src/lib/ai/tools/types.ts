@@ -34,6 +34,8 @@ export interface ToolCall {
   id: string;
   name: string;
   arguments: Record<string, unknown>;
+  // Gemini 3 specific: thought signature for function calls
+  thoughtSignature?: string;
 }
 
 /**
@@ -47,12 +49,19 @@ export interface ToolResult {
 }
 
 /**
+ * AI Scope type - determines the context of AI operations
+ */
+export type AIScope = 'project' | 'personal';
+
+/**
  * Tool execution context
  */
 export interface ToolExecutionContext {
-  projectId: string;
+  scope: AIScope;
+  projectId: string;      // For project scope (required for backward compatibility)
+  projectIds?: string[];  // For personal scope (all user's project IDs)
   userId: string;
-  listId?: string; // Default list for task creation
+  listId?: string;        // Default list for task creation
 }
 
 /**
@@ -76,13 +85,20 @@ export interface CreateTaskArgs {
   title: string;
   description?: string;
   priority?: 'high' | 'medium' | 'low';
-  dueDate?: string; // ISO 8601 format
+  startDate?: string; // ISO 8601 format - task start date for Gantt
+  durationDays?: number; // Duration in days - if set with startDate, dueDate is auto-calculated
+  dueDate?: string; // ISO 8601 format - task end/due date (auto-calculated if durationDays is set)
+  isDueDateFixed?: boolean; // If true, due date is fixed (duration changes won't auto-adjust it)
+  listId?: string; // Target list ID, falls back to context.listId if not provided
+  dependsOnTaskIds?: string[]; // Task IDs that must be completed before this task
 }
 
 export interface CreateTaskResult {
   taskId: string;
   title: string;
   success: boolean;
+  suggestedStartDate?: string; // Auto-suggested start date based on dependencies
+  warnings?: string[]; // Warnings about date calculations, deadline overdue, etc.
 }
 
 // Multiple tasks creation

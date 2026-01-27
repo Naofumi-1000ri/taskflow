@@ -56,6 +56,7 @@ function convertDoc<T>(doc: DocumentData, id: string): T {
     completedAt: data.completedAt ? toDate(data.completedAt) : null,
     isAbandoned: data.isAbandoned ?? false,
     dependsOnTaskIds: data.dependsOnTaskIds ?? [],
+    isDueDateFixed: data.isDueDateFixed ?? false, // Default: duration優先
     // Default values for Project fields (for backward compatibility)
     order: data.order ?? 0,
     createdAt: toDate(data.createdAt),

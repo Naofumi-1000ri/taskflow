@@ -11,16 +11,14 @@ import { Button } from '@/components/ui/button';
 import { Settings, AlertCircle } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
 import { useAISettingsStore } from '@/stores/aiSettingsStore';
-import { useAIChat } from '@/hooks/useAIChat';
-import { useAIConversations, useAIMessages } from '@/hooks/useAIConversations';
+import { useConversation } from '@/hooks/useConversation';
+import { useAIConversations } from '@/hooks/useAIConversations';
 import { ChatInput } from './ChatInput';
 import { ChatMessage } from './ChatMessage';
 import { ConversationList } from './ConversationList';
 import { ToolConfirmDialog } from './ToolConfirmDialog';
 import { AIContext, PROVIDER_DISPLAY_NAMES } from '@/types/ai';
 import { ToolCall } from '@/lib/ai/tools/types';
-import { executeTools } from '@/lib/ai/toolExecutor';
-import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 
 interface SupportAIPanelProps {
@@ -37,123 +35,45 @@ export function SupportAIPanel({ projectId, context }: SupportAIPanelProps) {
   const [showConversations, setShowConversations] = useState(true);
   const [showToolConfirm, setShowToolConfirm] = useState(false);
   const [pendingTools, setPendingTools] = useState<ToolCall[] | null>(null);
-  const [isExecutingTools, setIsExecutingTools] = useState(false);
 
-  // Conversations management
+  // Conversations list management
   const {
     conversations,
     isLoading: conversationsLoading,
-    error: conversationError,
-    createNewConversation,
     deleteConversationById,
   } = useAIConversations({ projectId, userId: context.user.id });
 
-  // Messages for current conversation
+  // Conversation state and messaging
   const {
-    messages: savedMessages,
-    addUserMessage,
-    addAssistantMessage,
-  } = useAIMessages({
-    projectId,
-    conversationId: selectedConversationId,
-  });
-
-  // Chat state and streaming
-  const {
-    messages: chatMessages,
-    isLoading: chatLoading,
-    error: chatError,
+    messages,
+    isLoading,
+    error,
     sendMessage,
-    setMessages,
+    confirmToolExecution,
+    cancelToolExecution,
     clearMessages,
-    clearPendingToolCalls,
-  } = useAIChat({
-    enableTools: true,
-    onComplete: async (content) => {
-      // Save assistant message when streaming completes
-      if (selectedConversationId && content) {
-        await addAssistantMessage(content);
-      }
-    },
-    onToolCalls: (toolCalls) => {
-      // Show confirmation dialog when tool calls are received
+  } = useConversation({
+    projectId,
+    userId: context.user.id,
+    context,
+    conversationId: selectedConversationId,
+    onConversationCreated: (id) => setSelectedConversationId(id),
+    onToolConfirmRequired: (toolCalls) => {
       setPendingTools(toolCalls);
       setShowToolConfirm(true);
     },
   });
 
-  // Sync saved messages to chat state when conversation changes
-  // Don't sync while streaming to avoid overwriting the streaming response
-  useEffect(() => {
-    if (chatLoading) return;
-
-    if (savedMessages.length > 0) {
-      setMessages(savedMessages);
-    } else if (!selectedConversationId) {
-      // Only clear when no conversation is selected (starting fresh)
-      clearMessages();
-    }
-  }, [savedMessages, setMessages, clearMessages, chatLoading, selectedConversationId]);
-
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
+  }, [messages]);
 
   // Handle sending a message
-  const handleSendMessage = useCallback(
-    async (content: string) => {
-      console.log('[AI] handleSendMessage called', {
-        projectId,
-        selectedConversationId,
-        userId: context.user.id,
-        content: content.substring(0, 50)
-      });
-
-      if (!projectId) {
-        console.error('[AI] No projectId - aborting');
-        return;
-      }
-
-      let conversationId = selectedConversationId;
-
-      // Create new conversation if none selected
-      if (!conversationId) {
-        console.log('[AI] Creating new conversation...');
-        conversationId = await createNewConversation({
-          contextType: context.task ? 'task' : 'project',
-          contextId: context.task?.id || context.project.id,
-        });
-        console.log('[AI] Conversation created:', conversationId);
-        if (conversationId) {
-          setSelectedConversationId(conversationId);
-        }
-      }
-
-      if (!conversationId) {
-        console.error('[AI] Failed to create conversation - aborting');
-        return;
-      }
-
-      // Save user message to Firestore
-      console.log('[AI] Saving user message...');
-      await addUserMessage(content);
-
-      // Send to AI and stream response
-      console.log('[AI] Sending to AI...');
-      await sendMessage(content, context);
-      console.log('[AI] sendMessage completed');
-    },
-    [
-      projectId,
-      selectedConversationId,
-      context,
-      createNewConversation,
-      setSelectedConversationId,
-      addUserMessage,
-      sendMessage,
-    ]
-  );
+  const handleSendMessage = useCallback(async (content: string) => {
+    if (!projectId) return;
+    await sendMessage(content);
+  }, [projectId, sendMessage]);
 
   // Handle creating a new conversation
   const handleNewConversation = useCallback(() => {
@@ -162,112 +82,34 @@ export function SupportAIPanel({ projectId, context }: SupportAIPanelProps) {
   }, [setSelectedConversationId, clearMessages]);
 
   // Handle selecting a conversation
-  const handleSelectConversation = useCallback(
-    (id: string) => {
-      setSelectedConversationId(id);
-    },
-    [setSelectedConversationId]
-  );
+  const handleSelectConversation = useCallback((id: string) => {
+    setSelectedConversationId(id);
+  }, [setSelectedConversationId]);
 
   // Handle deleting a conversation
-  const handleDeleteConversation = useCallback(
-    async (id: string) => {
-      await deleteConversationById(id);
-      if (selectedConversationId === id) {
-        setSelectedConversationId(null);
-        clearMessages();
-      }
-    },
-    [deleteConversationById, selectedConversationId, setSelectedConversationId, clearMessages]
-  );
+  const handleDeleteConversation = useCallback(async (id: string) => {
+    await deleteConversationById(id);
+    if (selectedConversationId === id) {
+      setSelectedConversationId(null);
+      clearMessages();
+    }
+  }, [deleteConversationById, selectedConversationId, setSelectedConversationId, clearMessages]);
 
   // Handle tool execution confirmation
   const handleToolConfirm = useCallback(async () => {
-    if (!pendingTools || !projectId || !context.user.id) return;
+    if (!pendingTools) return;
 
-    setIsExecutingTools(true);
-
-    try {
-      // Get the first list ID from the project for task creation
-      const defaultListId = context.project.lists[0]?.id;
-
-      const results = await executeTools(pendingTools, {
-        projectId,
-        userId: context.user.id,
-        listId: defaultListId,
-      });
-
-      // Update the assistant message with tool execution results
-      const successCount = results.filter((r) => r.success).length;
-      const totalCount = results.length;
-
-      setMessages((prev) => {
-        const updated = [...prev];
-        const lastIndex = updated.length - 1;
-        if (updated[lastIndex]?.role === 'assistant') {
-          const currentContent = updated[lastIndex].content;
-          const resultMessage =
-            successCount === totalCount
-              ? `\n\n${totalCount}件のタスクを作成しました。`
-              : `\n\n${successCount}/${totalCount}件のタスクを作成しました。`;
-          updated[lastIndex] = {
-            ...updated[lastIndex],
-            content: currentContent + resultMessage,
-          };
-        }
-        return updated;
-      });
-
-      // Save the updated message
-      if (selectedConversationId) {
-        const lastMessage = chatMessages[chatMessages.length - 1];
-        if (lastMessage?.role === 'assistant') {
-          const resultMessage =
-            successCount === totalCount
-              ? `\n\n${totalCount}件のタスクを作成しました。`
-              : `\n\n${successCount}/${totalCount}件のタスクを作成しました。`;
-          await addAssistantMessage(lastMessage.content + resultMessage);
-        }
-      }
-    } catch (error) {
-      console.error('Tool execution error:', error);
-    } finally {
-      setIsExecutingTools(false);
-      setShowToolConfirm(false);
-      setPendingTools(null);
-      clearPendingToolCalls();
-    }
-  }, [
-    pendingTools,
-    projectId,
-    context.user.id,
-    context.project.lists,
-    setMessages,
-    selectedConversationId,
-    chatMessages,
-    addAssistantMessage,
-    clearPendingToolCalls,
-  ]);
+    setShowToolConfirm(false);
+    await confirmToolExecution(pendingTools);
+    setPendingTools(null);
+  }, [pendingTools, confirmToolExecution]);
 
   // Handle tool cancellation
   const handleToolCancel = useCallback(() => {
     setShowToolConfirm(false);
     setPendingTools(null);
-    clearPendingToolCalls();
-
-    // Add a message indicating the user cancelled
-    setMessages((prev) => {
-      const updated = [...prev];
-      const lastIndex = updated.length - 1;
-      if (updated[lastIndex]?.role === 'assistant') {
-        updated[lastIndex] = {
-          ...updated[lastIndex],
-          content: updated[lastIndex].content + '\n\n（タスク作成がキャンセルされました）',
-        };
-      }
-      return updated;
-    });
-  }, [clearPendingToolCalls, setMessages]);
+    cancelToolExecution();
+  }, [cancelToolExecution]);
 
   // Navigate to settings page
   const handleGoToSettings = useCallback(() => {
@@ -332,7 +174,7 @@ export function SupportAIPanel({ projectId, context }: SupportAIPanelProps) {
             )}
             <div className="flex min-h-0 flex-1 flex-col">
               {/* Context Preview */}
-              {context.task && (
+              {context.task && context.project && (
                 <div className="border-b bg-muted/30 px-4 py-2">
                   <div className="text-xs text-muted-foreground">
                     コンテキスト: {context.project.name}
@@ -345,7 +187,7 @@ export function SupportAIPanel({ projectId, context }: SupportAIPanelProps) {
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto">
-                {chatMessages.length === 0 ? (
+                {messages.length === 0 ? (
                   <div className="flex h-full flex-col items-center justify-center p-8 text-center">
                     <div className="mb-4 rounded-full bg-muted p-4">
                       <Settings className="h-8 w-8 text-muted-foreground" />
@@ -368,33 +210,45 @@ export function SupportAIPanel({ projectId, context }: SupportAIPanelProps) {
                   </div>
                 ) : (
                   <div>
-                    {chatMessages.map((message, index) => (
-                      <ChatMessage
-                        key={message.id || index}
-                        message={message}
-                        isStreaming={
-                          chatLoading &&
-                          index === chatMessages.length - 1 &&
-                          message.role === 'assistant'
+                    {messages
+                      // Filter out tool messages and empty assistant messages (except streaming)
+                      .filter((message, index) => {
+                        // Hide tool result messages
+                        if (message.role === 'tool') return false;
+                        // Hide empty assistant messages unless it's the last one and streaming
+                        if (message.role === 'assistant' && !message.content) {
+                          const isLastMessage = index === messages.length - 1;
+                          return isLastMessage && isLoading;
                         }
-                      />
-                    ))}
+                        return true;
+                      })
+                      .map((message, index, filteredMessages) => (
+                        <ChatMessage
+                          key={message.id || index}
+                          message={message}
+                          isStreaming={
+                            isLoading &&
+                            index === filteredMessages.length - 1 &&
+                            message.role === 'assistant'
+                          }
+                        />
+                      ))}
                     <div ref={messagesEndRef} />
                   </div>
                 )}
               </div>
 
               {/* Error display */}
-              {(chatError || conversationError) && (
+              {error && (
                 <div className="border-t bg-destructive/10 px-4 py-2 text-sm text-destructive">
-                  {chatError || conversationError}
+                  {error}
                 </div>
               )}
 
               {/* Input */}
               <ChatInput
                 onSend={handleSendMessage}
-                isLoading={chatLoading}
+                isLoading={isLoading}
                 disabled={!projectId}
                 placeholder={
                   context.task
@@ -414,7 +268,7 @@ export function SupportAIPanel({ projectId, context }: SupportAIPanelProps) {
         toolCalls={pendingTools || []}
         onConfirm={handleToolConfirm}
         onCancel={handleToolCancel}
-        isExecuting={isExecutingTools}
+        isExecuting={isLoading}
       />
     </Sheet>
   );

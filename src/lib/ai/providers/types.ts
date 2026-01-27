@@ -14,6 +14,10 @@ export type StreamChunk =
  */
 export interface SendMessageOptions {
   enableTools?: boolean;
+  // When true, this is a continuation after tool execution - AI should interpret results
+  isToolResultContinuation?: boolean;
+  // When true, use personal scope tools (cross-project)
+  isPersonalScope?: boolean;
 }
 
 /**

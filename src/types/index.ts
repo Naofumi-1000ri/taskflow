@@ -70,6 +70,8 @@ export interface Task {
   priority: Priority | null;
   startDate: Date | null;
   dueDate: Date | null;
+  durationDays: number | null; // Duration in days (for Gantt chart). If set, dueDate = startDate + durationDays
+  isDueDateFixed: boolean; // true=期限固定（duration優先しない）, false=duration優先（期限自動計算）
   isCompleted: boolean;
   completedAt: Date | null; // When the task was completed
   isAbandoned: boolean; // Task was abandoned/cancelled

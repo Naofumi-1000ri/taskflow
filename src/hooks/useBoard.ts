@@ -189,6 +189,8 @@ export function useBoard(projectId: string | null) {
         priority: null,
         startDate: null,
         dueDate: null,
+        durationDays: null,
+        isDueDateFixed: false,
         isCompleted: shouldAutoComplete,
         completedAt: shouldAutoComplete ? new Date() : null,
         isAbandoned: false,
@@ -292,6 +294,8 @@ export function useBoard(projectId: string | null) {
         priority: originalTask.priority,
         startDate: originalTask.startDate,
         dueDate: originalTask.dueDate,
+        durationDays: originalTask.durationDays,
+        isDueDateFixed: originalTask.isDueDateFixed,
         isCompleted: false, // New task starts as incomplete
         completedAt: null,
         isAbandoned: false,
