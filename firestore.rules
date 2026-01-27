@@ -23,6 +23,15 @@ service cloud.firestore {
       allow read: if isAllowedUser();
       allow write: if isAllowedUser() && request.auth.uid == userId;
       allow create: if isAllowedUser();
+
+      // 個人AI会話（相棒AI）
+      match /personalConversations/{conversationId} {
+        allow read, write: if isAllowedUser() && request.auth.uid == userId;
+
+        match /messages/{messageId} {
+          allow read, write: if isAllowedUser() && request.auth.uid == userId;
+        }
+      }
     }
 
     // プロジェクト - 許可ドメインの全ユーザーがアクセス可能
