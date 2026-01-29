@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { AIContext, AIMessage } from '@/types/ai';
 import { useAISettingsStore } from '@/stores/aiSettingsStore';
 import { ToolCall } from '@/lib/ai/tools/types';
@@ -149,7 +150,10 @@ export function useUnifiedConversation({
 
             if (parsed.type === 'text' && parsed.content) {
               fullContent += parsed.content;
-              onText(fullContent);
+              // Use flushSync to force immediate render during streaming
+              flushSync(() => {
+                onText(fullContent);
+              });
             } else if (parsed.type === 'tool_calls' && parsed.toolCalls) {
               toolCalls = parsed.toolCalls;
               onToolCalls(parsed.toolCalls as ToolCall[]);
