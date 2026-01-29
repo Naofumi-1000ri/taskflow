@@ -3,6 +3,10 @@ import { getProvider, isValidProvider } from '@/lib/ai/providers';
 import { AIContext, AIMessage, AIProviderType } from '@/types/ai';
 import { verifyAuthToken, getUserAIApiKey } from '@/lib/firebase/admin';
 
+// Enable streaming for Vercel
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 interface ChatRequest {
   messages: AIMessage[];
   context: AIContext;
@@ -104,8 +108,9 @@ export async function POST(request: NextRequest) {
     return new Response(stream, {
       headers: {
         'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
       },
     });
   } catch (error) {

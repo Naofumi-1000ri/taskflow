@@ -18,10 +18,19 @@ service cloud.firestore {
       return isAuthenticated() && isAllowedDomain();
     }
 
-    // プロジェクトメンバーかどうかチェック
-    function isProjectMember(projectId) {
-      return isAllowedUser() &&
-             exists(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid));
+    // プロジェクトメンバーかどうかチェック（membersサブコレクション）
+    function isProjectMemberByDoc(projectId) {
+      return exists(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid));
+    }
+
+    // プロジェクトメンバーかどうかチェック（memberIds配列）
+    function isProjectMemberByArray(projectId) {
+      return request.auth.uid in get(/databases/$(database)/documents/projects/$(projectId)).data.memberIds;
+    }
+
+    // いずれかの方法でメンバーであればOK
+    function canAccessProject(projectId) {
+      return isAllowedUser() && (isProjectMemberByDoc(projectId) || isProjectMemberByArray(projectId));
     }
 
     // ユーザードキュメント
@@ -57,68 +66,70 @@ service cloud.firestore {
     // プロジェクト - メンバーのみアクセス可能
     match /projects/{projectId} {
       // プロジェクトの読み取りはメンバーのみ
-      allow read: if isProjectMember(projectId);
+      // memberIdsフィールドでのクエリもサポート（クロスプロジェクト検索用）
+      allow read: if canAccessProject(projectId) ||
+                     (isAllowedUser() && request.auth.uid in resource.data.memberIds);
       // プロジェクトの作成は許可ドメインの全ユーザー
       allow create: if isAllowedUser();
       // プロジェクトの更新・削除はメンバーのみ
-      allow update, delete: if isProjectMember(projectId);
+      allow update, delete: if canAccessProject(projectId);
 
       // メンバー管理
       match /members/{memberId} {
         // メンバー一覧の読み取りはプロジェクトメンバーのみ
-        allow read: if isProjectMember(projectId);
+        allow read: if canAccessProject(projectId);
         // メンバーの追加はプロジェクトメンバーのみ（最初のメンバーはプロジェクト作成時に追加）
         allow write: if isAllowedUser();
       }
 
       match /lists/{listId} {
-        allow read, write: if isProjectMember(projectId);
+        allow read, write: if canAccessProject(projectId);
       }
 
       match /tasks/{taskId} {
-        allow read, write: if isProjectMember(projectId);
+        allow read, write: if canAccessProject(projectId);
 
         match /comments/{commentId} {
-          allow read, write: if isProjectMember(projectId);
+          allow read, write: if canAccessProject(projectId);
         }
 
         match /checklists/{checklistId} {
-          allow read, write: if isProjectMember(projectId);
+          allow read, write: if canAccessProject(projectId);
         }
 
         match /attachments/{attachmentId} {
-          allow read, write: if isProjectMember(projectId);
+          allow read, write: if canAccessProject(projectId);
         }
       }
 
       match /labels/{labelId} {
-        allow read, write: if isProjectMember(projectId);
+        allow read, write: if canAccessProject(projectId);
       }
 
       match /tags/{tagId} {
-        allow read, write: if isProjectMember(projectId);
+        allow read, write: if canAccessProject(projectId);
       }
 
       // アクティビティログ
       match /activityLogs/{logId} {
-        allow read, write: if isProjectMember(projectId);
+        allow read, write: if canAccessProject(projectId);
       }
 
       // AI会話
       match /aiConversations/{conversationId} {
-        allow read, write: if isProjectMember(projectId);
+        allow read, write: if canAccessProject(projectId);
 
         match /messages/{messageId} {
-          allow read, write: if isProjectMember(projectId);
+          allow read, write: if canAccessProject(projectId);
         }
       }
 
       // 旧形式のconversations
       match /conversations/{conversationId} {
-        allow read, write: if isProjectMember(projectId);
+        allow read, write: if canAccessProject(projectId);
 
         match /messages/{messageId} {
-          allow read, write: if isProjectMember(projectId);
+          allow read, write: if canAccessProject(projectId);
         }
       }
     }
