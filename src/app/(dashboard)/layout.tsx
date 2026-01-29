@@ -12,9 +12,10 @@ import { useUIStore } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { useHotkeys } from '@/hooks/useHotkeys';
-import { SupportAIPanel } from '@/components/ai/SupportAIPanel';
-import { PersonalAIButton } from '@/components/ai/PersonalAIButton';
-import { AIContext } from '@/types/ai';
+import { CompanionAI } from '@/components/ai/CompanionAI';
+import { CommandPalette } from '@/components/common/CommandPalette';
+import { UndoToast } from '@/components/common/UndoToast';
+import { useUndoStore } from '@/stores/undoStore';
 
 export default function DashboardLayout({
   children,
@@ -23,8 +24,9 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, isAuthenticated, isLoading } = useAuth();
-  const { isSidebarOpen, isSidebarCollapsed, openProjectModal } = useUIStore();
+  const { isAuthenticated, isLoading } = useAuth();
+  const { isSidebarOpen, isSidebarCollapsed, openProjectModal, openCommandPalette } = useUIStore();
+  const { undo: performUndo, redo: performRedo } = useUndoStore();
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   // Extract projectId from pathname if on a project page
@@ -32,22 +34,6 @@ export default function DashboardLayout({
     const match = pathname?.match(/\/projects\/([^/]+)/);
     return match ? match[1] : null;
   }, [pathname]);
-
-  // Create basic AI context (full context will be provided by project pages)
-  const defaultAIContext: AIContext = useMemo(() => ({
-    scope: 'project',
-    project: {
-      id: currentProjectId || '',
-      name: 'ダッシュボード',
-      description: '',
-      lists: [],
-      members: [],
-    },
-    user: {
-      id: user?.id || '',
-      displayName: user?.displayName || 'ユーザー',
-    },
-  }), [user, currentProjectId]);
 
   // Hotkey callbacks
   const handleNewTask = useCallback(() => {
@@ -83,15 +69,33 @@ export default function DashboardLayout({
     setIsHelpOpen(true);
   }, []);
 
+  const handleCommandPalette = useCallback(() => {
+    openCommandPalette();
+  }, [openCommandPalette]);
+
+  const handleUndo = useCallback(() => {
+    performUndo();
+  }, [performUndo]);
+
+  const handleRedo = useCallback(() => {
+    performRedo();
+  }, [performRedo]);
+
   // Register hotkeys
   const hotkeys = useMemo(
     () => [
+      { key: 'k', callback: handleCommandPalette, metaKey: true },
+      { key: 'k', callback: handleCommandPalette, ctrlKey: true },
+      { key: 'z', callback: handleUndo, metaKey: true },
+      { key: 'z', callback: handleUndo, ctrlKey: true },
+      { key: 'z', callback: handleRedo, metaKey: true, shiftKey: true },
+      { key: 'z', callback: handleRedo, ctrlKey: true, shiftKey: true },
       { key: 'n', callback: handleNewTask },
       { key: 'Escape', callback: handleEscape },
       { key: '/', callback: handleSearch },
       { key: '?', callback: handleShowHelp, shiftKey: true },
     ],
-    [handleNewTask, handleEscape, handleSearch, handleShowHelp]
+    [handleCommandPalette, handleUndo, handleRedo, handleNewTask, handleEscape, handleSearch, handleShowHelp]
   );
 
   useHotkeys(hotkeys);
@@ -116,7 +120,7 @@ export default function DashboardLayout({
 
   return (
     <NotificationProvider>
-      <div className="flex h-screen min-w-[480px] flex-col overflow-hidden">
+      <div className="flex h-screen min-w-[320px] flex-col overflow-hidden">
         <Header />
         <div className="flex min-h-0 flex-1">
           <Sidebar />
@@ -131,12 +135,9 @@ export default function DashboardLayout({
         </div>
         <ProjectFormModal />
         <ShortcutHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
-        {/* Project AI Panel for project pages, Personal AI Button for dashboard */}
-        {currentProjectId ? (
-          <SupportAIPanel projectId={currentProjectId} context={defaultAIContext} />
-        ) : (
-          <PersonalAIButton />
-        )}
+        <CommandPalette />
+        <UndoToast />
+        <CompanionAI projectId={currentProjectId} />
       </div>
     </NotificationProvider>
   );

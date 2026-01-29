@@ -6,6 +6,7 @@ import { AITool, ToolHandler } from './types';
 // ============================================
 
 export interface CompleteTaskArgs {
+  projectId?: string;
   taskId: string;
   isCompleted: boolean;
 }
@@ -24,6 +25,10 @@ export const completeTaskToolDefinition: AITool = {
   parameters: {
     type: 'object',
     properties: {
+      projectId: {
+        type: 'string',
+        description: 'タスクが属するプロジェクトのID（ダッシュボードから操作する場合に必要。プロジェクトページでは不要）',
+      },
       taskId: {
         type: 'string',
         description: 'タスクのID（必須）',
@@ -41,8 +46,12 @@ export const completeTaskHandler: ToolHandler<CompleteTaskArgs, CompleteTaskResu
   args,
   context
 ) => {
-  const { taskId, isCompleted } = args;
-  const { projectId } = context;
+  const { projectId: argsProjectId, taskId, isCompleted } = args;
+  const projectId = context.projectId || argsProjectId;
+
+  if (!projectId) {
+    throw new Error('プロジェクトIDが指定されていません。get_my_tasks_across_projects で取得したprojectIdを指定してください。');
+  }
 
   const task = await getTask(projectId, taskId);
   if (!task) {

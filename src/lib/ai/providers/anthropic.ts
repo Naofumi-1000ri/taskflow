@@ -82,7 +82,11 @@ export class AnthropicProvider implements AIProvider {
     model?: string,
     options?: SendMessageOptions
   ): AsyncGenerator<StreamChunk, void, unknown> {
-    const systemPrompt = buildSystemPrompt(context, options?.enableTools && !options?.isToolResultContinuation, options?.isPersonalScope);
+    // Resolve projectId: explicit null = personal scope, undefined = use context
+    const resolvedProjectId = options?.projectId !== undefined
+      ? options.projectId
+      : (context.project?.id || null);
+    const systemPrompt = buildCompanionSystemPrompt(context, options?.enableTools && !options?.isToolResultContinuation, resolvedProjectId);
     const modelToUse = model || DEFAULT_MODELS.anthropic;
 
     // Convert messages to Anthropic format (handles tool_use and tool_result)
@@ -98,12 +102,10 @@ export class AnthropicProvider implements AIProvider {
 
     // Add tools if enabled - allow chained tool calls for multi-step operations
     if (options?.enableTools) {
-      const tools = getAnthropicTools(options?.isPersonalScope);
+      const tools = getAnthropicTools({ projectId: resolvedProjectId });
       requestBody.tools = tools;
       // Force tool use for better compliance
       requestBody.tool_choice = { type: 'auto' };
-      console.log('[Anthropic] Adding tools to request:', tools.map(t => t.name).join(', '), 'Personal scope:', options?.isPersonalScope);
-      console.log('[Anthropic] Tool count:', tools.length);
     }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -204,115 +206,9 @@ export class AnthropicProvider implements AIProvider {
   }
 }
 
-function buildSystemPrompt(context: AIContext, enableTools?: boolean, isPersonalScope?: boolean): string {
-  // Personal scope has different system prompt
-  if (isPersonalScope) {
-    return buildPersonalSystemPrompt(context, enableTools);
-  }
-
-  let prompt = `あなたはタスク管理アプリ「TaskFlow」のサポートAIアシスタントです。
-`;
-
-  // Put tool instructions FIRST if enabled
-  if (enableTools) {
-    prompt += `
-## 最重要ルール - ツールの使用
-
-あなたには複数のツールが提供されています。**ユーザーに何かを聞き返す前に、必ずツールを使って情報を取得してください。**
-
-### 絶対禁止事項
-- 「リストIDを教えてください」と聞く → 代わりに get_lists を呼ぶ
-- 「どのタスクですか？」と聞く → 代わりに get_tasks を呼ぶ
-- 「メンバーIDが必要です」と言う → 代わりに get_members を呼ぶ
-
-### 操作の手順
-1. 「〜リストにタスク追加して」と言われたら:
-   - まず get_lists を呼んでリストIDを取得
-   - 取得したIDで create_task を呼ぶ
-
-2. 「〜さんに担当を設定して」と言われたら:
-   - まず get_members を呼んでメンバーIDを取得
-   - 取得したIDで assign_task を呼ぶ
-
-### ツール一覧
-- get_lists: リスト一覧を取得（order=0が一番左）
-- get_members: メンバー一覧を取得
-- get_labels: ラベル一覧を取得
-- get_tasks: タスク一覧を取得
-- get_project_summary: プロジェクト概要を取得
-- create_task: タスクを作成
-- update_task: タスクを更新
-- delete_task: タスクを削除
-- complete_task: タスクを完了
-- move_task: タスクを移動
-- assign_task: 担当者を設定
-
-`;
-  }
-
-  // Get today's date
-  const today = new Date();
-  const todayISO = today.toISOString().split('T')[0];
-
-  prompt += `
-## 現在のコンテキスト
-
-### 日付情報
-- 今日の日付: ${todayISO}
-- 「今日から」「本日から」と言われた場合は ${todayISO} を開始日として使用してください
-
-### ユーザー情報
-- 名前: ${context.user.displayName}
-
-### プロジェクト情報
-- プロジェクト名: ${context.project?.name || 'なし'}
-- 説明: ${context.project?.description || 'なし'}
-- リスト: ${context.project?.lists.map((l) => `${l.name}(${l.taskCount}件)`).join(', ') || 'なし'}
-- メンバー: ${context.project?.members.map((m) => m.displayName).join(', ') || 'なし'}
-`;
-
-  if (context.task) {
-    prompt += `
-### 現在選択中のタスク
-- タイトル: ${context.task.title}
-- 説明: ${context.task.description || 'なし'}
-- 優先度: ${context.task.priority || '未設定'}
-- 期限: ${context.task.dueDate ? new Date(context.task.dueDate).toLocaleDateString('ja-JP') : '未設定'}
-- ステータス: ${context.task.status}
-- 担当者: ${context.task.assignees.join(', ') || '未割り当て'}
-`;
-
-    if (context.task.checklists.length > 0) {
-      prompt += `- チェックリスト:\n`;
-      for (const checklist of context.task.checklists) {
-        prompt += `  - ${checklist.title}:\n`;
-        for (const item of checklist.items) {
-          prompt += `    - [${item.isChecked ? 'x' : ' '}] ${item.text}\n`;
-        }
-      }
-    }
-
-    if (context.task.comments.length > 0) {
-      prompt += `- 最近のコメント:\n`;
-      for (const comment of context.task.comments.slice(-3)) {
-        prompt += `  - ${comment.authorName}: ${comment.content}\n`;
-      }
-    }
-  }
-
-  prompt += `
-## 回答のガイドライン
-- 日本語で回答してください
-- 簡潔で分かりやすい回答を心がけてください
-- タスク管理に関するアドバイスを提供してください
-- 必要に応じてタスクの分解や優先順位付けの提案をしてください
-`;
-
-  return prompt;
-}
-
 /**
- * Build system prompt for personal (cross-project) scope
+ * Unified companion system prompt builder for Anthropic.
+ * Tool instructions placed FIRST for better Anthropic compliance.
  */
 function getTimePeriodLabel(hour: number): string {
   if (hour >= 5 && hour <= 11) return '朝';
@@ -344,11 +240,12 @@ function getTimePeriodInstructions(hour: number): string {
 - 体調を気遣い、無理しないよう声をかけてください`;
 }
 
-function buildPersonalSystemPrompt(context: AIContext, enableTools?: boolean): string {
+function buildCompanionSystemPrompt(context: AIContext, enableTools?: boolean, projectId?: string | null): string {
   const currentHour = context.currentHour ?? new Date().getHours();
   const timePeriodLabel = getTimePeriodLabel(currentHour);
+  const hasProject = !!projectId;
 
-  let prompt = `あなたは「相棒」— ${context.user.displayName}さんの個人タスク管理パートナーです。
+  let prompt = `あなたは「相棒」— ${context.user.displayName}さんのタスク管理パートナーです。
 
 ## あなたの性格
 - 親しみやすく温かい口調（丁寧なカジュアル体）
@@ -365,28 +262,59 @@ ${getTimePeriodInstructions(currentHour)}
 3. **夕方の振り返り**: 日報生成、成果の振り返り、明日の準備
 `;
 
+  // Put tool instructions FIRST for Anthropic (better compliance)
   if (enableTools) {
-    prompt += `
+    if (hasProject) {
+      prompt += `
+## 最重要ルール - ツールの使用
+
+あなたには複数のツールが提供されています。**ユーザーに何かを聞き返す前に、必ずツールを使って情報を取得してください。**
+
+### 絶対禁止事項
+- 「リストIDを教えてください」と聞く → 代わりに get_lists を呼ぶ
+- 「どのタスクですか？」と聞く → 代わりに get_tasks を呼ぶ
+- 「メンバーIDが必要です」と言う → 代わりに get_members を呼ぶ
+
+### 操作の手順
+1. 「〜リストにタスク追加して」と言われたら:
+   - まず get_lists を呼んでリストIDを取得
+   - 取得したIDで create_task を呼ぶ
+
+2. 「〜さんに担当を設定して」と言われたら:
+   - まず get_members を呼んでメンバーIDを取得
+   - 取得したIDで assign_task を呼ぶ
+
+### プロジェクトツール
+- get_lists, get_members, get_labels, get_tasks, get_project_summary
+- create_task, update_task, delete_task, complete_task, move_task, assign_task
+
+### クロスプロジェクトツール
+- get_my_tasks_across_projects, get_workload_summary, suggest_work_priority, generate_daily_report
+
+`;
+    } else {
+      prompt += `
 ## ツールの使用
 
-あなたには4つのツールが提供されています。積極的にツールを使って情報を取得し、ユーザーに分かりやすく提示してください。
+あなたにはツールが提供されています。積極的にツールを使って情報を取得し、ユーザーに分かりやすく提示してください。
 
 ### ツール一覧
 - get_my_tasks_across_projects: 全プロジェクトを横断して自分のタスクを取得
-- get_workload_summary: ワークロードのサマリーを取得（期限切れ、今日期限、優先度などを分析）
-- suggest_work_priority: 作業優先順位を提案（期限や依存関係を考慮）
-- generate_daily_report: 日報を生成（完了タスク、進行中タスク、ブロック中タスクをまとめる）
+- get_workload_summary: ワークロードのサマリーを取得
+- suggest_work_priority: 作業優先順位を提案
+- generate_daily_report: 日報を生成
+- update_task: タスクを更新（projectIdパラメータ必須）
+- complete_task: タスクを完了/未完了にする（projectIdパラメータ必須）
 
-### 使い方の例
-- 「今日何をすればいい？」→ suggest_work_priority を呼ぶ
-- 「日報を作って」→ generate_daily_report を呼ぶ
-- 「タスクを確認したい」→ get_my_tasks_across_projects を呼ぶ
-- 「負荷はどうなってる？」→ get_workload_summary を呼ぶ
+### タスク修正の手順
+1. まず get_my_tasks_across_projects でタスク一覧を取得（各タスクにprojectIdが含まれる）
+2. 取得した projectId と taskId を使って update_task や complete_task を呼ぶ
 
 `;
+
+    }
   }
 
-  // Get today's date
   const today = new Date();
   const todayISO = today.toISOString().split('T')[0];
 
@@ -395,13 +323,52 @@ ${getTimePeriodInstructions(currentHour)}
 
 ### 日付情報
 - 今日の日付: ${todayISO}
+- 「今日から」「本日から」と言われた場合は ${todayISO} を開始日として使用してください
 
 ### ユーザー情報
 - 名前: ${context.user.displayName}
 `;
 
-  // List all projects
-  if (context.projects && context.projects.length > 0) {
+  if (hasProject && context.project) {
+    prompt += `
+### プロジェクト情報（現在のプロジェクト）
+- プロジェクト名: ${context.project.name}
+- 説明: ${context.project.description || 'なし'}
+- リスト: ${context.project.lists.map((l) => `${l.name}(${l.taskCount}件)`).join(', ') || 'なし'}
+- メンバー: ${context.project.members.map((m) => m.displayName).join(', ') || 'なし'}
+`;
+
+    if (context.task) {
+      prompt += `
+### 現在選択中のタスク
+- タイトル: ${context.task.title}
+- 説明: ${context.task.description || 'なし'}
+- 優先度: ${context.task.priority || '未設定'}
+- 期限: ${context.task.dueDate ? new Date(context.task.dueDate).toLocaleDateString('ja-JP') : '未設定'}
+- ステータス: ${context.task.status}
+- 担当者: ${context.task.assignees.join(', ') || '未割り当て'}
+`;
+
+      if (context.task.checklists.length > 0) {
+        prompt += `- チェックリスト:\n`;
+        for (const checklist of context.task.checklists) {
+          prompt += `  - ${checklist.title}:\n`;
+          for (const item of checklist.items) {
+            prompt += `    - [${item.isChecked ? 'x' : ' '}] ${item.text}\n`;
+          }
+        }
+      }
+
+      if (context.task.comments.length > 0) {
+        prompt += `- 最近のコメント:\n`;
+        for (const comment of context.task.comments.slice(-3)) {
+          prompt += `  - ${comment.authorName}: ${comment.content}\n`;
+        }
+      }
+    }
+  }
+
+  if (!hasProject && context.projects && context.projects.length > 0) {
     prompt += `
 ### 参加プロジェクト（${context.projects.length}件）
 `;
@@ -418,8 +385,9 @@ ${getTimePeriodInstructions(currentHour)}
 ## 回答のガイドライン
 - 日本語で回答してください
 - 簡潔で分かりやすい回答を心がけてください
-- プロジェクト横断で優先順位や作業負荷を分析してください
-- 日報やサマリーを出力する際は、マークダウン形式で見やすく整形してください
+- タスク管理に関するアドバイスを提供してください
+- 必要に応じてタスクの分解や優先順位付けの提案をしてください
+${!hasProject ? '- プロジェクト横断で優先順位や作業負荷を分析してください\n- 日報やサマリーを出力する際は、マークダウン形式で見やすく整形してください' : ''}
 `;
 
   return prompt;

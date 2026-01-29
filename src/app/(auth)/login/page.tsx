@@ -29,12 +29,8 @@ export default function LoginPage() {
 
   const handleTestSignIn = async () => {
     try {
-      console.log('[Login] Starting test sign in...');
       await signInAsTestUser();
-      console.log('[Login] Test sign in completed, isAuthenticated:', isAuthenticated);
-      console.log('[Login] Pushing to /...');
       router.push('/');
-      console.log('[Login] router.push called');
     } catch (error) {
       console.error('Test login failed:', error);
     }

@@ -31,8 +31,8 @@ export interface AIMessage {
 // Conversation types
 export interface AIConversation {
   id: string;
-  projectId: string;    // For project scope, empty for personal
-  scope: AIScope;       // 'project' or 'personal'
+  projectId: string | null;  // For project scope, null for personal/companion
+  scope: AIScope;             // 'project' | 'personal' | 'companion'
   title: string;
   contextType: 'task' | 'project' | 'personal' | null;
   contextId: string | null;
@@ -80,7 +80,7 @@ export interface AIProjectContext {
 }
 
 // AI Scope type
-export type AIScope = 'project' | 'personal';
+export type AIScope = 'project' | 'personal' | 'companion';
 
 export interface AIContext {
   scope: AIScope;

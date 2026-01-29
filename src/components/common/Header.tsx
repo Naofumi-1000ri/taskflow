@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Menu, Search, User, Settings, LogOut, Bot } from 'lucide-react';
+import { Menu, Search, User, Settings, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -16,10 +16,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
 import { NotificationDropdown } from './NotificationDropdown';
+import { cn } from '@/lib/utils';
 
 export function Header() {
   const { user, signOut } = useAuth();
-  const { toggleSidebar, openAIPanel } = useUIStore();
+  const { toggleSidebar, openCommandPalette } = useUIStore();
 
   const getInitials = (name: string) => {
     return name
@@ -49,31 +50,31 @@ export function Header() {
         <span className="hidden font-semibold md:inline-block">TaskFlow</span>
       </Link>
 
-      <div className="min-w-0 flex-1">
-        <form>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="タスクを検索..."
-              className="w-full max-w-sm pl-8"
-            />
-          </div>
-        </form>
+      <div className="hidden min-w-0 flex-1 sm:block">
+        <button
+          type="button"
+          onClick={openCommandPalette}
+          className="flex h-9 w-full max-w-sm items-center gap-2 rounded-md border bg-background px-3 text-sm text-muted-foreground hover:bg-accent"
+        >
+          <Search className="h-4 w-4" />
+          <span>検索...</span>
+          <kbd className="ml-auto rounded border bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+            ⌘K
+          </kbd>
+        </button>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 sm:gap-2">
         <Button
           variant="ghost"
           size="icon"
-          onClick={openAIPanel}
-          className="relative"
-          title="AIアシスタント"
+          className="sm:hidden"
+          onClick={openCommandPalette}
+          title="検索"
         >
-          <Bot className="h-5 w-5" />
-          <span className="sr-only">AIアシスタント</span>
+          <Search className="h-5 w-5" />
+          <span className="sr-only">検索</span>
         </Button>
-
         <NotificationDropdown />
 
         <DropdownMenu>

@@ -14,31 +14,44 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAISettings } from '@/hooks/useAISettings';
 import { AIProviderType } from '@/types/ai';
-import { Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 export function AISettingsForm() {
   const {
     provider,
-    apiKey,
-    model,
     isConfigured,
+    isSaving,
+    model,
     providers,
     defaultModels,
     setProvider,
-    setApiKey,
+    saveApiKey,
     setModel,
   } = useAISettings();
 
   const [showApiKey, setShowApiKey] = useState(false);
-  const [localApiKey, setLocalApiKey] = useState(apiKey);
+  const [localApiKey, setLocalApiKey] = useState('');
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const handleProviderChange = (value: string) => {
     setProvider(value as AIProviderType);
-    setLocalApiKey(''); // Reset local API key when provider changes
+    setLocalApiKey('');
+    setSaveError(null);
+    setSaveSuccess(false);
   };
 
-  const handleSaveApiKey = () => {
-    setApiKey(localApiKey);
+  const handleSaveApiKey = async () => {
+    setSaveError(null);
+    setSaveSuccess(false);
+    try {
+      await saveApiKey(localApiKey);
+      setLocalApiKey('');
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'APIキーの保存に失敗しました');
+    }
   };
 
   const handleResetModel = () => {
@@ -80,7 +93,11 @@ export function AISettingsForm() {
                   type={showApiKey ? 'text' : 'password'}
                   value={localApiKey}
                   onChange={(e) => setLocalApiKey(e.target.value)}
-                  placeholder={`${provider.toUpperCase()} APIキーを入力`}
+                  placeholder={
+                    isConfigured
+                      ? '新しいAPIキーを入力して更新'
+                      : `${provider.toUpperCase()} APIキーを入力`
+                  }
                   className="pr-10"
                 />
                 <Button
@@ -97,14 +114,34 @@ export function AISettingsForm() {
                   )}
                 </Button>
               </div>
-              <Button onClick={handleSaveApiKey} disabled={localApiKey === apiKey}>
+              <Button
+                onClick={handleSaveApiKey}
+                disabled={!localApiKey || isSaving}
+              >
+                {isSaving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
                 保存
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              APIキーはブラウザのローカルストレージに保存されます。
+              APIキーはサーバー側に安全に保存されます。ブラウザには保存されません。
             </p>
           </div>
+
+          {/* Save feedback */}
+          {saveError && (
+            <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <span className="text-sm text-destructive">{saveError}</span>
+            </div>
+          )}
+          {saveSuccess && (
+            <div className="flex items-center gap-2 rounded-md bg-green-50 p-3">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <span className="text-sm text-green-600">APIキーを保存しました</span>
+            </div>
+          )}
 
           {/* API Key Status */}
           <div className="flex items-center gap-2 rounded-md bg-muted p-3">

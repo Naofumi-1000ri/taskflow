@@ -115,3 +115,45 @@ export function buildPersonalAIContext(options: {
     projects: options.projects.map(buildProjectContext),
   };
 }
+
+/**
+ * Build companion AI context — dynamic based on whether projectId is present.
+ * When projectId is given: includes project + task context (project page).
+ * When projectId is null: includes all projects overview (dashboard).
+ */
+export function buildCompanionContext(options: {
+  user: { id: string; displayName: string };
+  projectId: string | null;
+  project?: Parameters<typeof buildProjectContext>[0];
+  task?: Parameters<typeof buildTaskContext>[0];
+  projects?: Array<Parameters<typeof buildProjectContext>[0]>;
+  currentHour?: number;
+}): AIContext {
+  const currentHour = options.currentHour ?? new Date().getHours();
+
+  if (options.projectId && options.project) {
+    // Project page context
+    return {
+      scope: 'companion',
+      user: {
+        id: options.user.id,
+        displayName: options.user.displayName,
+      },
+      project: buildProjectContext(options.project),
+      task: options.task ? buildTaskContext(options.task) : undefined,
+      projects: options.projects?.map(buildProjectContext),
+      currentHour,
+    };
+  }
+
+  // Dashboard context
+  return {
+    scope: 'companion',
+    user: {
+      id: options.user.id,
+      displayName: options.user.displayName,
+    },
+    projects: (options.projects || []).map(buildProjectContext),
+    currentHour,
+  };
+}

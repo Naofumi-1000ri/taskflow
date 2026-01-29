@@ -3,33 +3,38 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AIConversation } from '@/types/ai';
 import {
-  createPersonalConversation,
-  updatePersonalConversationTitle,
-  deletePersonalConversation,
-  subscribeToPersonalConversations,
+  createUnifiedConversation,
+  updateUnifiedConversationTitle,
+  deleteUnifiedConversation,
+  subscribeToUnifiedConversations,
 } from '@/lib/ai/conversationStorage';
 
-interface UsePersonalConversationsOptions {
+interface UseUnifiedConversationsOptions {
   userId: string | null;
+  projectId?: string | null;
 }
 
-interface UsePersonalConversationsReturn {
+interface UseUnifiedConversationsReturn {
   conversations: AIConversation[];
   isLoading: boolean;
   error: string | null;
-  createNewConversation: (options?: { title?: string }) => Promise<string | null>;
+  createNewConversation: (options?: {
+    projectId?: string | null;
+    title?: string;
+  }) => Promise<string | null>;
   updateTitle: (conversationId: string, title: string) => Promise<void>;
   deleteConversationById: (conversationId: string) => Promise<void>;
 }
 
-export function usePersonalConversations({
+export function useUnifiedConversations({
   userId,
-}: UsePersonalConversationsOptions): UsePersonalConversationsReturn {
+  projectId,
+}: UseUnifiedConversationsOptions): UseUnifiedConversationsReturn {
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Subscribe to personal conversations
+  // Subscribe to conversations (filtered by projectId if provided)
   useEffect(() => {
     if (!userId) {
       setConversations([]);
@@ -40,22 +45,34 @@ export function usePersonalConversations({
     setIsLoading(true);
     setError(null);
 
-    const unsubscribe = subscribeToPersonalConversations(userId, (convs) => {
-      setConversations(convs);
-      setIsLoading(false);
-    });
+    const unsubscribe = subscribeToUnifiedConversations(
+      userId,
+      (convs) => {
+        setConversations(convs);
+        setIsLoading(false);
+      },
+      // Pass projectId for filtering
+      // undefined = no filter (all conversations)
+      // null = dashboard conversations only
+      // string = specific project conversations
+      projectId !== undefined ? { projectId } : undefined
+    );
 
     return () => unsubscribe();
-  }, [userId]);
+  }, [userId, projectId]);
 
   const createNewConversation = useCallback(
-    async (options?: { title?: string }): Promise<string | null> => {
-      if (!userId) {
-        return null;
-      }
+    async (options?: {
+      projectId?: string | null;
+      title?: string;
+    }): Promise<string | null> => {
+      if (!userId) return null;
 
       try {
-        const conversationId = await createPersonalConversation(userId, options);
+        const conversationId = await createUnifiedConversation(userId, {
+          projectId: options?.projectId ?? projectId ?? null,
+          title: options?.title,
+        });
         return conversationId;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to create conversation';
@@ -63,7 +80,7 @@ export function usePersonalConversations({
         return null;
       }
     },
-    [userId]
+    [userId, projectId]
   );
 
   const updateTitle = useCallback(
@@ -71,7 +88,7 @@ export function usePersonalConversations({
       if (!userId) return;
 
       try {
-        await updatePersonalConversationTitle(userId, conversationId, title);
+        await updateUnifiedConversationTitle(userId, conversationId, title);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to update title';
         setError(errorMessage);
@@ -85,7 +102,7 @@ export function usePersonalConversations({
       if (!userId) return;
 
       try {
-        await deletePersonalConversation(userId, conversationId);
+        await deleteUnifiedConversation(userId, conversationId);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to delete conversation';
         setError(errorMessage);

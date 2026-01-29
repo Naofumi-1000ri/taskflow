@@ -50,7 +50,8 @@ interface GanttChartProps {
 
 const TASK_ROW_HEIGHT = 40;
 const HEADER_HEIGHT = 60;
-const SIDEBAR_WIDTH = 280;
+const SIDEBAR_WIDTH_DESKTOP = 280;
+const SIDEBAR_WIDTH_MOBILE = 160;
 const TOOLBAR_HEIGHT = 56;
 const MIN_CHART_HEIGHT = 300;
 
@@ -67,6 +68,17 @@ export function GanttChart({
   const timelineTasksRef = useRef<HTMLDivElement>(null);
   const [scrollLeft, setScrollLeft] = useState(0);
   const isScrollSyncing = useRef(false);
+
+  // Responsive sidebar width
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_WIDTH_DESKTOP);
+  useEffect(() => {
+    const updateWidth = () => {
+      setSidebarWidth(window.innerWidth < 640 ? SIDEBAR_WIDTH_MOBILE : SIDEBAR_WIDTH_DESKTOP);
+    };
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
 
   // Drag state for resizing/moving task bars
   type DragType = 'move' | 'resize-start' | 'resize-end';
@@ -366,9 +378,17 @@ export function GanttChart({
     return addDays(startOfDay(rangeStart), Math.round(daysFromStart));
   }, [viewMode, columnWidth, rangeStart]);
 
-  // Drag handlers
+  // Helper to extract clientX from both mouse and touch events
+  const getClientX = (e: MouseEvent | TouchEvent): number => {
+    if ('touches' in e) {
+      return e.changedTouches[0]?.clientX ?? 0;
+    }
+    return e.clientX;
+  };
+
+  // Drag handlers (support both mouse and touch)
   const handleDragStart = useCallback((
-    e: React.MouseEvent,
+    e: React.MouseEvent | React.TouchEvent,
     task: Task,
     type: DragType,
     barStart: number,
@@ -380,10 +400,12 @@ export function GanttChart({
     e.preventDefault();
     e.stopPropagation();
 
+    const clientX = 'touches' in e ? (e.touches[0]?.clientX ?? 0) : e.clientX;
+
     setDragState({
       taskId: task.id,
       type,
-      initialMouseX: e.clientX,
+      initialMouseX: clientX,
       initialBarStart: barStart,
       initialBarWidth: barWidth,
       task,
@@ -391,10 +413,14 @@ export function GanttChart({
     setDragPreview({ left: barStart, width: barWidth });
   }, []);
 
-  const handleDragMove = useCallback((e: MouseEvent) => {
+  const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
     if (!dragState) return;
 
-    const deltaX = e.clientX - dragState.initialMouseX;
+    // Prevent scroll while dragging on touch
+    if ('touches' in e) e.preventDefault();
+
+    const clientX = getClientX(e);
+    const deltaX = clientX - dragState.initialMouseX;
     let newLeft = dragState.initialBarStart;
     let newWidth = dragState.initialBarWidth;
 
@@ -421,7 +447,7 @@ export function GanttChart({
     setDragPreview({ left: newLeft, width: newWidth });
   }, [dragState, columnWidth]);
 
-  const handleDragEnd = useCallback((e: MouseEvent) => {
+  const handleDragEnd = useCallback((e: MouseEvent | TouchEvent) => {
     if (!dragState || !dragPreview || !onTaskUpdate) {
       setDragState(null);
       setDragPreview(null);
@@ -429,7 +455,8 @@ export function GanttChart({
     }
 
     // Check if there was actual movement (more than 5px threshold)
-    const movedDistance = Math.abs(e.clientX - dragState.initialMouseX);
+    const clientX = getClientX(e);
+    const movedDistance = Math.abs(clientX - dragState.initialMouseX);
     if (movedDistance < 5) {
       // No significant movement - treat as click, not drag
       setDragState(null);
@@ -538,14 +565,18 @@ export function GanttChart({
     setDragPreview(null);
   }, [dragState, dragPreview, onTaskUpdate, pixelToDate, tasks]);
 
-  // Add/remove global mouse event listeners for drag
+  // Add/remove global mouse and touch event listeners for drag
   useEffect(() => {
     if (dragState) {
       window.addEventListener('mousemove', handleDragMove);
       window.addEventListener('mouseup', handleDragEnd);
+      window.addEventListener('touchmove', handleDragMove, { passive: false });
+      window.addEventListener('touchend', handleDragEnd);
       return () => {
         window.removeEventListener('mousemove', handleDragMove);
         window.removeEventListener('mouseup', handleDragEnd);
+        window.removeEventListener('touchmove', handleDragMove);
+        window.removeEventListener('touchend', handleDragEnd);
       };
     }
   }, [dragState, handleDragMove, handleDragEnd]);
@@ -559,7 +590,7 @@ export function GanttChart({
   return (
     <div className="flex flex-col">
       {/* Toolbar */}
-      <div className="flex items-center justify-between border-b p-3" style={{ height: TOOLBAR_HEIGHT }}>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b p-2 sm:p-3" style={{ minHeight: TOOLBAR_HEIGHT }}>
         <div className="flex items-center gap-2">
           <Select
             value={viewMode}
@@ -691,7 +722,7 @@ export function GanttChart({
             </PopoverContent>
           </Popover>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="hidden items-center gap-4 sm:flex">
           {/* Legend */}
           <div className="flex items-center gap-3 text-sm">
             {lists.slice(0, 5).map((list) => (
@@ -712,7 +743,7 @@ export function GanttChart({
         {/* Fixed Sidebar */}
         <div
           className="flex flex-shrink-0 flex-col border-r bg-background"
-          style={{ width: SIDEBAR_WIDTH }}
+          style={{ width: sidebarWidth }}
         >
           {/* Sidebar Header */}
           <div
@@ -999,13 +1030,22 @@ export function GanttChart({
                               handleDragStart(e, task, 'move', bar.start, bar.width);
                             }
                           }}
+                          onTouchStart={(e) => {
+                            if (!task.isCompleted && !isPredicted && bar) {
+                              handleDragStart(e, task, 'move', bar.start, bar.width);
+                            }
+                          }}
                         >
                           {/* Left resize handle */}
                           {!task.isCompleted && !isPredicted && (
                             <div
-                              className="absolute left-0 top-0 z-20 h-full w-2 cursor-ew-resize opacity-0 group-hover:opacity-100"
+                              className="absolute left-0 top-0 z-20 h-full w-3 cursor-ew-resize opacity-0 group-hover:opacity-100 touch:opacity-50"
                               style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
                               onMouseDown={(e) => {
+                                e.stopPropagation();
+                                if (bar) handleDragStart(e, task, 'resize-start', bar.start, bar.width);
+                              }}
+                              onTouchStart={(e) => {
                                 e.stopPropagation();
                                 if (bar) handleDragStart(e, task, 'resize-start', bar.start, bar.width);
                               }}
@@ -1037,9 +1077,13 @@ export function GanttChart({
                           {/* Right resize handle */}
                           {!task.isCompleted && !isPredicted && (
                             <div
-                              className="absolute right-0 top-0 z-20 h-full w-2 cursor-ew-resize opacity-0 group-hover:opacity-100"
+                              className="absolute right-0 top-0 z-20 h-full w-3 cursor-ew-resize opacity-0 group-hover:opacity-100 touch:opacity-50"
                               style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
                               onMouseDown={(e) => {
+                                e.stopPropagation();
+                                if (bar) handleDragStart(e, task, 'resize-end', bar.start, bar.width);
+                              }}
+                              onTouchStart={(e) => {
                                 e.stopPropagation();
                                 if (bar) handleDragStart(e, task, 'resize-end', bar.start, bar.width);
                               }}

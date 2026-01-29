@@ -15,14 +15,17 @@ import {
   Trash2,
   Plus,
   Sun,
+  ClipboardList,
+  Search,
+  Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useProjects } from '@/hooks/useProjects';
 import { useAISettingsStore } from '@/stores/aiSettingsStore';
-import { usePersonalConversation } from '@/hooks/usePersonalConversation';
+import { useUnifiedConversation } from '@/hooks/useUnifiedConversation';
 import { useCompanionState } from '@/hooks/useCompanionState';
-import { usePersonalConversations } from '@/hooks/usePersonalConversations';
+import { useUnifiedConversations } from '@/hooks/useUnifiedConversations';
 import { ChatInput } from './ChatInput';
 import { ChatMessage } from './ChatMessage';
 import { ToolConfirmDialog } from './ToolConfirmDialog';
@@ -38,11 +41,16 @@ interface QuickAction {
   message: string;
 }
 
-// Quick actions are now built dynamically based on time period
+interface CompanionAIProps {
+  projectId: string | null;
+}
 
-export function PersonalAIButton() {
+export function CompanionAI({ projectId }: CompanionAIProps) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, firebaseUser } = useAuth();
+  // Derive userId/displayName with firebaseUser fallback (when Firestore is inaccessible)
+  const userId = user?.id || firebaseUser?.uid || '';
+  const displayName = user?.displayName || firebaseUser?.displayName || '';
   const { projects, isLoading: projectsLoading } = useProjects();
   const { provider, isConfigured } = useAISettingsStore();
   const {
@@ -64,25 +72,88 @@ export function PersonalAIButton() {
   const panelRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Build personal AI context
-  const personalContext: AIContext = useMemo(() => ({
-    scope: 'personal',
-    projects: projects.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description,
-      lists: [],
-      members: [],
-    })),
-    user: {
-      id: user?.id || '',
-      displayName: user?.displayName || 'ユーザー',
-    },
-    currentHour,
-  }), [user, projects, currentHour]);
+  // Find current project details
+  const currentProject = useMemo(
+    () => projects.find((p) => p.id === projectId),
+    [projects, projectId]
+  );
 
-  // Dynamic quick actions based on time period
+  // Build context dynamically based on projectId
+  const companionContext: AIContext = useMemo(() => {
+    if (projectId && currentProject) {
+      return {
+        scope: 'companion' as const,
+        project: {
+          id: currentProject.id,
+          name: currentProject.name,
+          description: currentProject.description || '',
+          lists: [],
+          members: [],
+        },
+        projects: projects.map((p) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description || '',
+          lists: [],
+          members: [],
+        })),
+        user: {
+          id: userId,
+          displayName,
+        },
+        currentHour,
+      };
+    }
+    return {
+      scope: 'companion' as const,
+      projects: projects.map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description || '',
+        lists: [],
+        members: [],
+      })),
+      user: {
+        id: userId,
+        displayName,
+      },
+      currentHour,
+    };
+  }, [userId, displayName, projects, currentProject, projectId, currentHour]);
+
+  // Dynamic quick actions based on context
   const quickActions: QuickAction[] = useMemo(() => {
+    if (projectId) {
+      // Project page actions
+      return [
+        {
+          id: 'create_task',
+          label: 'タスク作成',
+          icon: <ClipboardList className="h-4 w-4" />,
+          message: '新しいタスクを作成してください',
+        },
+        {
+          id: 'summary',
+          label: 'プロジェクト概要',
+          icon: <Search className="h-4 w-4" />,
+          message: 'このプロジェクトの概要を教えてください',
+        },
+        {
+          id: 'overdue',
+          label: '期限切れ確認',
+          icon: <Clock className="h-4 w-4" />,
+          message: '期限切れのタスクはありますか？',
+        },
+        {
+          id: 'report',
+          label: '日報生成',
+          icon: <FileText className="h-4 w-4" />,
+          message: '今日の日報を生成してください',
+        },
+      ];
+    }
+
+    // Dashboard actions (time-aware)
     const planAction: QuickAction = {
       id: 'plan',
       label: '今日の計画',
@@ -111,19 +182,21 @@ export function PersonalAIButton() {
     if (timePeriod === 'morning' || timePeriod === 'afternoon') {
       return [planAction, priorityAction, workloadAction, reportAction];
     }
-    // evening or night
     return [reportAction, priorityAction, workloadAction, planAction];
-  }, [timePeriod]);
+  }, [projectId, timePeriod]);
 
-  // Project IDs for personal scope
+  // Project IDs for cross-project tools
   const projectIds = useMemo(() => projects.map((p) => p.id), [projects]);
 
-  // Conversations list
+  // Conversations list (filtered by projectId context)
   const {
     conversations,
     isLoading: conversationsLoading,
     deleteConversationById,
-  } = usePersonalConversations({ userId: user?.id || null });
+  } = useUnifiedConversations({
+    userId: userId || null,
+    projectId: projectId ?? null,
+  });
 
   // Conversation hook
   const {
@@ -134,10 +207,11 @@ export function PersonalAIButton() {
     confirmToolExecution,
     cancelToolExecution,
     clearMessages,
-  } = usePersonalConversation({
-    userId: user?.id || '',
+  } = useUnifiedConversation({
+    userId,
+    projectId,
     projectIds,
-    context: personalContext,
+    context: companionContext,
     conversationId: selectedConversationId,
     onConversationCreated: (id) => setSelectedConversationId(id),
     onToolConfirmRequired: (toolCalls) => {
@@ -146,11 +220,16 @@ export function PersonalAIButton() {
     },
   });
 
+  // Reset conversation when projectId changes
+  useEffect(() => {
+    setSelectedConversationId(null);
+    clearMessages();
+  }, [projectId]);
+
   // Close panel on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        // Don't close if clicking on the tool confirm dialog
         const dialog = document.querySelector('[role="dialog"]');
         if (dialog && dialog.contains(e.target as Node)) {
           return;
@@ -187,21 +266,21 @@ export function PersonalAIButton() {
 
   // Remember open state in localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('personalAIPanelOpen');
+    const stored = localStorage.getItem('companionAIPanelOpen');
     if (stored === 'true') {
       setIsOpen(true);
     }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('personalAIPanelOpen', String(isOpen));
+    localStorage.setItem('companionAIPanelOpen', String(isOpen));
   }, [isOpen]);
 
   // Handle sending a message
   const handleSendMessage = useCallback(async (content: string) => {
-    if (!user?.id) return;
+    if (!userId) return;
     await sendMessage(content);
-  }, [user?.id, sendMessage]);
+  }, [userId, sendMessage]);
 
   // Handle quick action
   const handleQuickAction = useCallback((action: QuickAction) => {
@@ -252,11 +331,25 @@ export function PersonalAIButton() {
 
   const isApiConfigured = isConfigured();
 
-  // Auto-greeting on panel open
+  // Header title
+  const headerTitle = useMemo(() => {
+    if (projectId && currentProject) {
+      return `相棒 - ${currentProject.name}`;
+    }
+    if (timePeriod === 'morning') return '相棒 - 朝の準備';
+    if (timePeriod === 'evening') return '相棒 - 今日の振り返り';
+    return '相棒';
+  }, [projectId, currentProject, timePeriod]);
+
+  // Disable check - need either projects (dashboard) or projectId (project page)
+  const isDisabled = !projectId && projectIds.length === 0;
+
+  // Auto-greeting on panel open (dashboard only)
   const autoGreetSentRef = useRef(false);
   useEffect(() => {
     if (
       isOpen &&
+      !projectId &&
       messages.length === 0 &&
       !selectedConversationId &&
       isApiConfigured &&
@@ -279,13 +372,12 @@ export function PersonalAIButton() {
         return () => clearTimeout(timer);
       }
     }
-    // Reset when panel closes or new conversation starts
     if (!isOpen || selectedConversationId) {
       autoGreetSentRef.current = false;
     }
-  }, [isOpen, messages.length, selectedConversationId, isApiConfigured, projectIds.length, shouldShowMorningGreeting, shouldShowEveningReport, markMorningGreeted, markEveningReported, sendMessage]);
+  }, [isOpen, projectId, messages.length, selectedConversationId, isApiConfigured, projectIds.length, shouldShowMorningGreeting, shouldShowEveningReport, markMorningGreeted, markEveningReported, sendMessage]);
 
-  if (!user) return null;
+  if (!firebaseUser) return null;
 
   return (
     <>
@@ -296,11 +388,13 @@ export function PersonalAIButton() {
           'fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-all hover:scale-105',
           isOpen
             ? 'bg-muted text-muted-foreground'
-            : timePeriod === 'morning'
-              ? 'bg-amber-600 text-white'
-              : timePeriod === 'evening'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-primary text-primary-foreground'
+            : projectId
+              ? 'bg-primary text-primary-foreground'
+              : timePeriod === 'morning'
+                ? 'bg-amber-600 text-white'
+                : timePeriod === 'evening'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-primary text-primary-foreground'
         )}
       >
         {isOpen ? (
@@ -308,7 +402,7 @@ export function PersonalAIButton() {
         ) : (
           <Bot className="h-6 w-6" />
         )}
-        {hasBadge && !isOpen && (
+        {hasBadge && !isOpen && !projectId && (
           <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
             <span className="relative inline-flex h-4 w-4 rounded-full bg-red-500" />
@@ -324,20 +418,16 @@ export function PersonalAIButton() {
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b px-4 py-3">
-            <div className="flex items-center gap-2">
-              <MessageCircle className="h-5 w-5" />
-              <span className="font-medium">
-                {timePeriod === 'morning'
-                  ? '相棒 - 朝の準備'
-                  : timePeriod === 'evening'
-                    ? '相棒 - 今日の振り返り'
-                    : '相棒'}
+            <div className="flex items-center gap-2 min-w-0">
+              <MessageCircle className="h-5 w-5 shrink-0" />
+              <span className="truncate font-medium">
+                {headerTitle}
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="shrink-0 text-xs text-muted-foreground">
                 ({PROVIDER_DISPLAY_NAMES[provider]})
               </span>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex shrink-0 items-center gap-1">
               <Button
                 variant="ghost"
                 size="sm"
@@ -428,6 +518,18 @@ export function PersonalAIButton() {
 
               {/* Main Chat Area */}
               <div className="flex min-h-0 flex-1 flex-col">
+                {/* Context Preview (project page with task selected) */}
+                {projectId && companionContext.task && companionContext.project && (
+                  <div className="border-b bg-muted/30 px-4 py-2">
+                    <div className="text-xs text-muted-foreground">
+                      コンテキスト: {companionContext.project.name}
+                    </div>
+                    <div className="truncate text-sm font-medium">
+                      {companionContext.task.title}
+                    </div>
+                  </div>
+                )}
+
                 {/* Messages */}
                 <div className="flex-1 overflow-y-auto">
                   {messages.length === 0 ? (
@@ -436,20 +538,24 @@ export function PersonalAIButton() {
                         <Bot className="h-8 w-8 text-muted-foreground" />
                       </div>
                       <h3 className="font-medium">
-                        {timePeriod === 'morning'
-                          ? 'おはようございます！'
-                          : timePeriod === 'evening'
-                            ? 'お疲れ様です！'
-                            : '相棒'}
+                        {projectId
+                          ? `${currentProject?.name || 'プロジェクト'}のサポート`
+                          : timePeriod === 'morning'
+                            ? 'おはようございます！'
+                            : timePeriod === 'evening'
+                              ? 'お疲れ様です！'
+                              : '相棒'}
                       </h3>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {timePeriod === 'morning'
-                          ? '今日のタスクを整理しましょう'
-                          : timePeriod === 'afternoon'
-                            ? '午後も頑張りましょう'
-                            : timePeriod === 'evening'
-                              ? '今日の振り返りをしませんか？'
-                              : '何かお手伝いできることはありますか？'}
+                        {projectId
+                          ? 'タスクやプロジェクトについて何でも聞いてください'
+                          : timePeriod === 'morning'
+                            ? '今日のタスクを整理しましょう'
+                            : timePeriod === 'afternoon'
+                              ? '午後も頑張りましょう'
+                              : timePeriod === 'evening'
+                                ? '今日の振り返りをしませんか？'
+                                : '何かお手伝いできることはありますか？'}
                       </p>
 
                       {/* Quick Actions */}
@@ -458,7 +564,7 @@ export function PersonalAIButton() {
                           <button
                             key={action.id}
                             onClick={() => handleQuickAction(action)}
-                            disabled={projectsLoading || projectIds.length === 0}
+                            disabled={projectsLoading || isDisabled}
                             className="flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs transition-colors hover:bg-muted disabled:opacity-50"
                           >
                             {action.icon}
@@ -467,7 +573,7 @@ export function PersonalAIButton() {
                         ))}
                       </div>
 
-                      {projectIds.length === 0 && !projectsLoading && (
+                      {isDisabled && !projectsLoading && (
                         <p className="mt-4 text-xs text-muted-foreground">
                           プロジェクトがありません。まずプロジェクトを作成してください。
                         </p>
@@ -477,9 +583,7 @@ export function PersonalAIButton() {
                     <div>
                       {messages
                         .filter((message, index) => {
-                          // Hide tool result messages
                           if (message.role === 'tool') return false;
-                          // Hide empty assistant messages unless it's the last one and streaming
                           if (message.role === 'assistant' && !message.content) {
                             const isLastMessage = index === messages.length - 1;
                             return isLastMessage && isLoading;
@@ -516,7 +620,7 @@ export function PersonalAIButton() {
                       <button
                         key={action.id}
                         onClick={() => handleQuickAction(action)}
-                        disabled={isLoading || projectIds.length === 0}
+                        disabled={isLoading || isDisabled}
                         className="flex items-center gap-1 rounded-full border bg-background px-2 py-1 text-xs transition-colors hover:bg-muted disabled:opacity-50"
                       >
                         {action.icon}
@@ -530,8 +634,12 @@ export function PersonalAIButton() {
                 <ChatInput
                   onSend={handleSendMessage}
                   isLoading={isLoading}
-                  disabled={projectIds.length === 0}
-                  placeholder="何でも聞いてください..."
+                  disabled={isDisabled}
+                  placeholder={
+                    projectId
+                      ? 'プロジェクトについて質問...'
+                      : '何でも聞いてください...'
+                  }
                 />
               </div>
             </div>

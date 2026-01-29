@@ -18,13 +18,19 @@ service cloud.firestore {
       return isAuthenticated() && isAllowedDomain();
     }
 
+    // プロジェクトメンバーかどうかチェック
+    function isProjectMember(projectId) {
+      return isAllowedUser() &&
+             exists(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid));
+    }
+
     // ユーザードキュメント
     match /users/{userId} {
       allow read: if isAllowedUser();
       allow write: if isAllowedUser() && request.auth.uid == userId;
       allow create: if isAllowedUser();
 
-      // 個人AI会話（相棒AI）
+      // 個人AI会話（相棒AI - 旧パス）
       match /personalConversations/{conversationId} {
         allow read, write: if isAllowedUser() && request.auth.uid == userId;
 
@@ -32,61 +38,87 @@ service cloud.firestore {
           allow read, write: if isAllowedUser() && request.auth.uid == userId;
         }
       }
+
+      // 統合AI会話（相棒AI - 新パス）
+      match /conversations/{conversationId} {
+        allow read, write: if isAllowedUser() && request.auth.uid == userId;
+
+        match /messages/{messageId} {
+          allow read, write: if isAllowedUser() && request.auth.uid == userId;
+        }
+      }
+
+      // AI設定（APIキーなど） - 本人のみアクセス可
+      match /settings/{settingId} {
+        allow read, write: if isAllowedUser() && request.auth.uid == userId;
+      }
     }
 
-    // プロジェクト - 許可ドメインの全ユーザーがアクセス可能
+    // プロジェクト - メンバーのみアクセス可能
     match /projects/{projectId} {
-      allow read, write: if isAllowedUser();
+      // プロジェクトの読み取りはメンバーのみ
+      allow read: if isProjectMember(projectId);
+      // プロジェクトの作成は許可ドメインの全ユーザー
+      allow create: if isAllowedUser();
+      // プロジェクトの更新・削除はメンバーのみ
+      allow update, delete: if isProjectMember(projectId);
 
-      // プロジェクト内の全サブコレクション
+      // メンバー管理
       match /members/{memberId} {
-        allow read, write: if isAllowedUser();
+        // メンバー一覧の読み取りはプロジェクトメンバーのみ
+        allow read: if isProjectMember(projectId);
+        // メンバーの追加はプロジェクトメンバーのみ（最初のメンバーはプロジェクト作成時に追加）
+        allow write: if isAllowedUser();
       }
 
       match /lists/{listId} {
-        allow read, write: if isAllowedUser();
+        allow read, write: if isProjectMember(projectId);
       }
 
       match /tasks/{taskId} {
-        allow read, write: if isAllowedUser();
+        allow read, write: if isProjectMember(projectId);
 
-        // タスク内のサブコレクション
         match /comments/{commentId} {
-          allow read, write: if isAllowedUser();
+          allow read, write: if isProjectMember(projectId);
         }
 
         match /checklists/{checklistId} {
-          allow read, write: if isAllowedUser();
+          allow read, write: if isProjectMember(projectId);
         }
 
         match /attachments/{attachmentId} {
-          allow read, write: if isAllowedUser();
+          allow read, write: if isProjectMember(projectId);
         }
       }
 
       match /labels/{labelId} {
-        allow read, write: if isAllowedUser();
+        allow read, write: if isProjectMember(projectId);
       }
 
       match /tags/{tagId} {
-        allow read, write: if isAllowedUser();
+        allow read, write: if isProjectMember(projectId);
+      }
+
+      // アクティビティログ
+      match /activityLogs/{logId} {
+        allow read, write: if isProjectMember(projectId);
       }
 
       // AI会話
       match /aiConversations/{conversationId} {
-        allow read, write: if isAllowedUser();
+        allow read, write: if isProjectMember(projectId);
 
         match /messages/{messageId} {
-          allow read, write: if isAllowedUser();
+          allow read, write: if isProjectMember(projectId);
         }
       }
 
       // 旧形式のconversations
       match /conversations/{conversationId} {
-        allow read, write: if isAllowedUser();
+        allow read, write: if isProjectMember(projectId);
 
         match /messages/{messageId} {
-          allow read, write: if isAllowedUser();
+          allow read, write: if isProjectMember(projectId);
         }
       }
     }
@@ -94,13 +126,14 @@ service cloud.firestore {
     // 通知
     match /notifications/{notificationId} {
       allow read: if isAllowedUser() && resource.data.userId == request.auth.uid;
-      allow write: if isAllowedUser();
       allow create: if isAllowedUser();
+      allow update, delete: if isAllowedUser() && resource.data.userId == request.auth.uid;
     }
 
-    // ユーザーメモ
+    // ユーザーメモ - 本人のみ
     match /userMemos/{memoId} {
-      allow read, write: if isAllowedUser();
+      allow read, write: if isAllowedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isAllowedUser();
     }
   }
 }

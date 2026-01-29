@@ -19,13 +19,15 @@ export function useHotkeys(hotkeys: HotkeyConfig[]) {
     (event: KeyboardEvent) => {
       // Skip if typing in an input, textarea, or contenteditable
       const target = event.target as HTMLElement;
-      if (
+      const isInInput =
         target.tagName === 'INPUT' ||
         target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      ) {
-        // Allow Escape key to work even in input fields
-        if (event.key !== 'Escape') {
+        target.isContentEditable;
+
+      if (isInInput) {
+        // Allow Escape and modifier-key shortcuts (e.g. ⌘K) in input fields
+        const hasModifier = event.ctrlKey || event.metaKey;
+        if (event.key !== 'Escape' && !hasModifier) {
           return;
         }
       }
@@ -59,6 +61,9 @@ export function useHotkeys(hotkeys: HotkeyConfig[]) {
 
 // Preset hotkey definitions
 export const HOTKEY_DEFINITIONS = [
+  { key: 'k', label: '⌘K', description: 'コマンドパレットを開く', metaKey: true },
+  { key: 'z', label: '⌘Z', description: '操作を取り消す', metaKey: true },
+  { key: 'z', label: '⌘⇧Z', description: '操作をやり直す', metaKey: true, shiftKey: true },
   { key: 'n', label: 'N', description: '新規タスクを作成' },
   { key: 'Escape', label: 'Esc', description: 'モーダルを閉じる' },
   { key: '/', label: '/', description: '検索にフォーカス' },

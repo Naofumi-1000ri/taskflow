@@ -185,6 +185,40 @@ export interface UserMemo {
   updatedAt: Date;
 }
 
+// Activity log types
+export interface ActivityLog {
+  id: string;
+  projectId: string;
+  targetType: ActivityTargetType;
+  targetId: string;
+  targetName: string;
+  action: ActivityAction;
+  userId: string;
+  userName: string;
+  changes?: ActivityChange[];
+  createdAt: Date;
+}
+
+export interface ActivityChange {
+  field: string;
+  oldValue?: string;
+  newValue?: string;
+}
+
+export type ActivityTargetType = 'task' | 'list' | 'project' | 'member';
+
+export type ActivityAction =
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'move'
+  | 'complete'
+  | 'reopen'
+  | 'assign'
+  | 'unassign'
+  | 'add_member'
+  | 'remove_member';
+
 // Label color presets
 export const LABEL_COLORS = [
   { name: 'red', value: '#ef4444' },

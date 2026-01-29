@@ -1,4 +1,4 @@
-import { AITool, RegisteredTool, ToolHandler } from './types';
+import { AITool, RegisteredTool, ToolHandler, ToolScope } from './types';
 import {
   createTaskToolDefinition,
   createTasksToolDefinition,
@@ -69,188 +69,195 @@ import {
 } from './personalTools';
 
 /**
- * Registry of all available AI tools
+ * Unified registry of all available AI tools (project + personal)
  */
-export const toolRegistry: Map<string, RegisteredTool> = new Map();
+export const unifiedToolRegistry: Map<string, RegisteredTool> = new Map();
 
 // ============================================
-// Task Creation Tools
+// Project-scope Tools
 // ============================================
-toolRegistry.set('create_task', {
+
+// Task Creation Tools
+unifiedToolRegistry.set('create_task', {
   definition: createTaskToolDefinition,
   handler: createTaskHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
-toolRegistry.set('create_tasks', {
+unifiedToolRegistry.set('create_tasks', {
   definition: createTasksToolDefinition,
   handler: createTasksHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
-// ============================================
 // Task Modification Tools
-// ============================================
-toolRegistry.set('update_task', {
+unifiedToolRegistry.set('update_task', {
   definition: updateTaskToolDefinition,
   handler: updateTaskHandler as unknown as ToolHandler,
+  scope: 'both',
 });
 
-toolRegistry.set('delete_task', {
+unifiedToolRegistry.set('delete_task', {
   definition: deleteTaskToolDefinition,
   handler: deleteTaskHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
-toolRegistry.set('complete_task', {
+unifiedToolRegistry.set('complete_task', {
   definition: completeTaskToolDefinition,
   handler: completeTaskHandler as unknown as ToolHandler,
+  scope: 'both',
 });
 
-toolRegistry.set('move_task', {
+unifiedToolRegistry.set('move_task', {
   definition: moveTaskToolDefinition,
   handler: moveTaskHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
-toolRegistry.set('assign_task', {
+unifiedToolRegistry.set('assign_task', {
   definition: assignTaskToolDefinition,
   handler: assignTaskHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
-// ============================================
 // Query Tools (Read-only)
-// ============================================
-toolRegistry.set('get_tasks', {
+unifiedToolRegistry.set('get_tasks', {
   definition: getTasksToolDefinition,
   handler: getTasksHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
-toolRegistry.set('get_task_details', {
+unifiedToolRegistry.set('get_task_details', {
   definition: getTaskDetailsToolDefinition,
   handler: getTaskDetailsHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
-toolRegistry.set('get_project_summary', {
+unifiedToolRegistry.set('get_project_summary', {
   definition: getProjectSummaryToolDefinition,
   handler: getProjectSummaryHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
-toolRegistry.set('get_my_tasks', {
+unifiedToolRegistry.set('get_my_tasks', {
   definition: getMyTasksToolDefinition,
   handler: getMyTasksHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
-toolRegistry.set('get_overdue_tasks', {
+unifiedToolRegistry.set('get_overdue_tasks', {
   definition: getOverdueTasksToolDefinition,
   handler: getOverdueTasksHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
-// ============================================
 // Project Structure Query Tools (Read-only)
-// ============================================
-toolRegistry.set('get_lists', {
+unifiedToolRegistry.set('get_lists', {
   definition: getListsToolDefinition,
   handler: getListsHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
-toolRegistry.set('get_members', {
+unifiedToolRegistry.set('get_members', {
   definition: getMembersToolDefinition,
   handler: getMembersHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
-toolRegistry.set('get_labels', {
+unifiedToolRegistry.set('get_labels', {
   definition: getLabelsToolDefinition,
   handler: getLabelsHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
-// ============================================
 // Schedule Analysis Tools
-// ============================================
-toolRegistry.set('suggest_schedule_changes', {
+unifiedToolRegistry.set('suggest_schedule_changes', {
   definition: suggestScheduleChangesToolDefinition,
   handler: suggestScheduleChangesHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
-toolRegistry.set('notify_dependency_delays', {
+unifiedToolRegistry.set('notify_dependency_delays', {
   definition: notifyDependencyDelaysToolDefinition,
   handler: notifyDependencyDelaysHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
-// ============================================
 // Plan Generation Tools
-// ============================================
-toolRegistry.set('generate_task_plan', {
+unifiedToolRegistry.set('generate_task_plan', {
   definition: generateTaskPlanToolDefinition,
   handler: generateTaskPlanHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
-toolRegistry.set('execute_task_plan', {
+unifiedToolRegistry.set('execute_task_plan', {
   definition: executeTaskPlanToolDefinition,
   handler: executeTaskPlanHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
-// ============================================
 // Quality Assistance Tools
-// ============================================
-toolRegistry.set('suggest_improvements', {
+unifiedToolRegistry.set('suggest_improvements', {
   definition: suggestImprovementsToolDefinition,
   handler: suggestImprovementsHandler as unknown as ToolHandler,
+  scope: 'project',
 });
 
 // ============================================
-// Personal AI Tools Registry (Cross-project)
+// Personal-scope Tools (Cross-project)
 // ============================================
-export const personalToolRegistry: Map<string, RegisteredTool> = new Map();
-
-personalToolRegistry.set('get_my_tasks_across_projects', {
+unifiedToolRegistry.set('get_my_tasks_across_projects', {
   definition: getMyTasksAcrossProjectsToolDefinition,
   handler: getMyTasksAcrossProjectsHandler as unknown as ToolHandler,
+  scope: 'personal',
 });
 
-personalToolRegistry.set('get_workload_summary', {
+unifiedToolRegistry.set('get_workload_summary', {
   definition: getWorkloadSummaryToolDefinition,
   handler: getWorkloadSummaryHandler as unknown as ToolHandler,
+  scope: 'personal',
 });
 
-personalToolRegistry.set('suggest_work_priority', {
+unifiedToolRegistry.set('suggest_work_priority', {
   definition: suggestWorkPriorityToolDefinition,
   handler: suggestWorkPriorityHandler as unknown as ToolHandler,
+  scope: 'personal',
 });
 
-personalToolRegistry.set('generate_daily_report', {
+unifiedToolRegistry.set('generate_daily_report', {
   definition: generateDailyReportToolDefinition,
   handler: generateDailyReportHandler as unknown as ToolHandler,
+  scope: 'personal',
 });
 
+// ============================================
+// Unified API
+// ============================================
+
 /**
- * Get all tool definitions for AI API (project scope)
+ * Get tool definitions based on context.
+ * If projectId is provided, returns project + personal tools.
+ * Otherwise, returns only personal tools.
  */
-export function getAllToolDefinitions(): AITool[] {
-  return Array.from(toolRegistry.values()).map((tool) => tool.definition);
+export function getToolDefinitions(options?: { projectId?: string | null }): AITool[] {
+  const hasProject = options?.projectId;
+  return Array.from(unifiedToolRegistry.values())
+    .filter((tool) => hasProject ? true : tool.scope === 'personal' || tool.scope === 'both')
+    .map((tool) => tool.definition);
 }
 
 /**
- * Get all personal tool definitions for AI API
+ * Get a tool from the unified registry
  */
-export function getPersonalToolDefinitions(): AITool[] {
-  return Array.from(personalToolRegistry.values()).map((tool) => tool.definition);
-}
-
-/**
- * Get a specific personal tool by name
- */
-export function getPersonalTool(name: string): RegisteredTool | undefined {
-  return personalToolRegistry.get(name);
-}
-
-/**
- * Get a specific tool by name
- */
-export function getTool(name: string): RegisteredTool | undefined {
-  return toolRegistry.get(name);
+export function getUnifiedTool(name: string): RegisteredTool | undefined {
+  return unifiedToolRegistry.get(name);
 }
 
 /**
  * Get tool definitions formatted for OpenAI API
  */
-export function getOpenAITools(isPersonalScope = false): Array<{
+export function getOpenAITools(options?: { projectId?: string | null }): Array<{
   type: 'function';
   function: {
     name: string;
@@ -258,7 +265,7 @@ export function getOpenAITools(isPersonalScope = false): Array<{
     parameters: object;
   };
 }> {
-  const tools = isPersonalScope ? getPersonalToolDefinitions() : getAllToolDefinitions();
+  const tools = getToolDefinitions(options);
   return tools.map((tool) => ({
     type: 'function' as const,
     function: {
@@ -272,12 +279,12 @@ export function getOpenAITools(isPersonalScope = false): Array<{
 /**
  * Get tool definitions formatted for Anthropic API
  */
-export function getAnthropicTools(isPersonalScope = false): Array<{
+export function getAnthropicTools(options?: { projectId?: string | null }): Array<{
   name: string;
   description: string;
   input_schema: object;
 }> {
-  const tools = isPersonalScope ? getPersonalToolDefinitions() : getAllToolDefinitions();
+  const tools = getToolDefinitions(options);
   return tools.map((tool) => ({
     name: tool.name,
     description: tool.description,
@@ -288,14 +295,14 @@ export function getAnthropicTools(isPersonalScope = false): Array<{
 /**
  * Get tool definitions formatted for Gemini API
  */
-export function getGeminiTools(isPersonalScope = false): Array<{
+export function getGeminiTools(options?: { projectId?: string | null }): Array<{
   functionDeclarations: Array<{
     name: string;
     description: string;
     parameters: object;
   }>;
 }> {
-  const tools = isPersonalScope ? getPersonalToolDefinitions() : getAllToolDefinitions();
+  const tools = getToolDefinitions(options);
   return [
     {
       functionDeclarations: tools.map((tool) => ({

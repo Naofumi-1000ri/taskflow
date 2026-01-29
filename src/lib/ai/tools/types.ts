@@ -51,7 +51,7 @@ export interface ToolResult {
 /**
  * AI Scope type - determines the context of AI operations
  */
-export type AIScope = 'project' | 'personal';
+export type AIScope = 'project' | 'personal' | 'companion';
 
 /**
  * Tool execution context
@@ -73,11 +73,17 @@ export type ToolHandler<TArgs = Record<string, unknown>, TResult = unknown> = (
 ) => Promise<TResult>;
 
 /**
+ * Tool scope - determines when a tool is available
+ */
+export type ToolScope = 'project' | 'personal' | 'both';
+
+/**
  * Registered tool with handler
  */
 export interface RegisteredTool {
   definition: AITool;
   handler: ToolHandler;
+  scope: ToolScope;
 }
 
 // Create task tool argument types

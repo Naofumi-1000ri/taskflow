@@ -9,9 +9,8 @@ interface UIState {
   selectedTaskId: string | null;
   isProjectModalOpen: boolean;
   selectedProjectId: string | null;
-  // AI Panel state
-  isAIPanelOpen: boolean;
-  selectedConversationId: string | null;
+  // Command palette state
+  isCommandPaletteOpen: boolean;
   // Actions
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
@@ -20,10 +19,9 @@ interface UIState {
   closeTaskModal: () => void;
   openProjectModal: (projectId?: string) => void;
   closeProjectModal: () => void;
-  // AI Panel actions
-  openAIPanel: () => void;
-  closeAIPanel: () => void;
-  setSelectedConversationId: (id: string | null) => void;
+  // Command palette actions
+  openCommandPalette: () => void;
+  closeCommandPalette: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -33,8 +31,7 @@ export const useUIStore = create<UIState>((set) => ({
   selectedTaskId: null,
   isProjectModalOpen: false,
   selectedProjectId: null,
-  isAIPanelOpen: false,
-  selectedConversationId: null,
+  isCommandPaletteOpen: false,
 
   toggleSidebar: () =>
     set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
@@ -55,11 +52,7 @@ export const useUIStore = create<UIState>((set) => ({
   closeProjectModal: () =>
     set({ isProjectModalOpen: false, selectedProjectId: null }),
 
-  openAIPanel: () => set({ isAIPanelOpen: true }),
+  openCommandPalette: () => set({ isCommandPaletteOpen: true }),
 
-  closeAIPanel: () =>
-    set({ isAIPanelOpen: false, selectedConversationId: null }),
-
-  setSelectedConversationId: (selectedConversationId) =>
-    set({ selectedConversationId }),
+  closeCommandPalette: () => set({ isCommandPaletteOpen: false }),
 }));

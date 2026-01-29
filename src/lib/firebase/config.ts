@@ -56,22 +56,13 @@ export async function initializeFirestore(): Promise<void> {
   if (typeof window !== 'undefined') {
     try {
       await enableIndexedDbPersistence(getFirebaseDb());
-      console.log('[Firestore] Offline persistence enabled');
     } catch (err: unknown) {
       const error = err as { code?: string };
-      if (error.code === 'failed-precondition') {
-        // Multiple tabs open, persistence can only be enabled in one tab at a time
-        console.warn('[Firestore] Persistence failed: multiple tabs open');
-      } else if (error.code === 'unimplemented') {
-        // The current browser doesn't support persistence
-        console.warn('[Firestore] Persistence not supported by browser');
-      } else {
+      if (error.code !== 'failed-precondition' && error.code !== 'unimplemented') {
         console.error('[Firestore] Persistence error:', err);
       }
     }
   }
-
-  console.log('[Firestore] Initialized');
 }
 
 export function getFirebaseStorage(): FirebaseStorage {

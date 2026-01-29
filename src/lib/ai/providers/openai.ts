@@ -62,7 +62,11 @@ export class OpenAIProvider implements AIProvider {
     model?: string,
     options?: SendMessageOptions
   ): AsyncGenerator<StreamChunk, void, unknown> {
-    const systemPrompt = buildSystemPrompt(context, options?.enableTools && !options?.isToolResultContinuation, options?.isPersonalScope);
+    // Resolve projectId: explicit null = personal scope, undefined = use context
+    const resolvedProjectId = options?.projectId !== undefined
+      ? options.projectId
+      : (context.project?.id || null);
+    const systemPrompt = buildCompanionSystemPrompt(context, options?.enableTools && !options?.isToolResultContinuation, resolvedProjectId);
     const modelToUse = model || DEFAULT_MODELS.openai;
 
     // Convert messages to OpenAI format (handles tool_calls and tool results)
@@ -79,7 +83,7 @@ export class OpenAIProvider implements AIProvider {
 
     // Add tools if enabled - allow chained tool calls for multi-step operations
     if (options?.enableTools) {
-      requestBody.tools = getOpenAITools(options?.isPersonalScope);
+      requestBody.tools = getOpenAITools({ projectId: resolvedProjectId });
       requestBody.tool_choice = 'auto';
     }
 
@@ -174,18 +178,62 @@ export class OpenAIProvider implements AIProvider {
   }
 }
 
-function buildSystemPrompt(context: AIContext, enableTools?: boolean, isPersonalScope?: boolean): string {
-  // Personal scope has different system prompt
-  if (isPersonalScope) {
-    return buildPersonalSystemPrompt(context, enableTools);
-  }
+/**
+ * Unified companion system prompt builder.
+ * Always uses "相棒" personality. Adds project context when projectId is present.
+ */
+function getTimePeriodLabel(hour: number): string {
+  if (hour >= 5 && hour <= 11) return '朝';
+  if (hour >= 12 && hour <= 16) return '午後';
+  if (hour >= 17 && hour <= 23) return '夕方';
+  return '深夜';
+}
 
-  // Get today's date
+function getTimePeriodInstructions(hour: number): string {
+  if (hour >= 5 && hour <= 11) {
+    return `- 元気で前向きな挨拶をしてください
+- タスクの整理と優先順位付けを積極的に提案してください
+- 期限切れや本日期限のタスクがあれば注意喚起してください
+- 「今日も一緒に頑張りましょう！」のような前向きな締めくくりを`;
+  }
+  if (hour >= 12 && hour <= 16) {
+    return `- 午後の進捗を気遣ってください
+- 負荷が高そうなら休憩や優先順位の見直しを提案してください
+- 残りの時間で取り組むべきタスクを整理してください`;
+  }
+  if (hour >= 17 && hour <= 23) {
+    return `- 「お疲れ様です」とねぎらいの言葉から始めてください
+- 日報作成を積極的にサポートしてください
+- 今日の成果を振り返り、達成を認めてください
+- 明日への引き継ぎ事項があれば整理してください`;
+  }
+  return `- 遅い時間の作業をねぎらってください
+- 簡潔にサポートしてください
+- 体調を気遣い、無理しないよう声をかけてください`;
+}
+
+function buildCompanionSystemPrompt(context: AIContext, enableTools?: boolean, projectId?: string | null): string {
+  const currentHour = context.currentHour ?? new Date().getHours();
+  const timePeriodLabel = getTimePeriodLabel(currentHour);
   const today = new Date();
   const todayISO = today.toISOString().split('T')[0];
+  const hasProject = !!projectId;
 
-  let prompt = `あなたはタスク管理アプリ「TaskFlow」のサポートAIアシスタントです。
-ユーザーのタスク管理や質問に対して、親切で的確なサポートを提供してください。
+  let prompt = `あなたは「相棒」— ${context.user.displayName}さんのタスク管理パートナーです。
+
+## あなたの性格
+- 親しみやすく温かい口調（丁寧なカジュアル体）
+- パートナーとして一緒に仕事を進める姿勢
+- 努力を認め、適度に励ます
+- 問題は一緒に考える
+
+## 現在の時間帯: ${timePeriodLabel}
+${getTimePeriodInstructions(currentHour)}
+
+## 役割
+1. **朝の計画**: タスク整理、優先順位付け、一日の目標設定
+2. **日中のサポート**: 進捗確認、優先順位調整、困りごとの相談
+3. **夕方の振り返り**: 日報生成、成果の振り返り、明日の準備
 
 ## 現在のコンテキスト
 
@@ -195,16 +243,20 @@ function buildSystemPrompt(context: AIContext, enableTools?: boolean, isPersonal
 
 ### ユーザー情報
 - 名前: ${context.user.displayName}
-
-### プロジェクト情報
-- プロジェクト名: ${context.project?.name || 'なし'}
-- 説明: ${context.project?.description || 'なし'}
-- リスト: ${context.project?.lists.map((l) => `${l.name}(${l.taskCount}件)`).join(', ') || 'なし'}
-- メンバー: ${context.project?.members.map((m) => m.displayName).join(', ') || 'なし'}
 `;
 
-  if (context.task) {
+  // Project context (when on a project page)
+  if (hasProject && context.project) {
     prompt += `
+### プロジェクト情報（現在のプロジェクト）
+- プロジェクト名: ${context.project.name}
+- 説明: ${context.project.description || 'なし'}
+- リスト: ${context.project.lists.map((l) => `${l.name}(${l.taskCount}件)`).join(', ') || 'なし'}
+- メンバー: ${context.project.members.map((m) => m.displayName).join(', ') || 'なし'}
+`;
+
+    if (context.task) {
+      prompt += `
 ### 現在選択中のタスク
 - タイトル: ${context.task.title}
 - 説明: ${context.task.description || 'なし'}
@@ -214,34 +266,43 @@ function buildSystemPrompt(context: AIContext, enableTools?: boolean, isPersonal
 - 担当者: ${context.task.assignees.join(', ') || '未割り当て'}
 `;
 
-    if (context.task.checklists.length > 0) {
-      prompt += `- チェックリスト:\n`;
-      for (const checklist of context.task.checklists) {
-        prompt += `  - ${checklist.title}:\n`;
-        for (const item of checklist.items) {
-          prompt += `    - [${item.isChecked ? 'x' : ' '}] ${item.text}\n`;
+      if (context.task.checklists.length > 0) {
+        prompt += `- チェックリスト:\n`;
+        for (const checklist of context.task.checklists) {
+          prompt += `  - ${checklist.title}:\n`;
+          for (const item of checklist.items) {
+            prompt += `    - [${item.isChecked ? 'x' : ' '}] ${item.text}\n`;
+          }
         }
       }
-    }
 
-    if (context.task.comments.length > 0) {
-      prompt += `- 最近のコメント:\n`;
-      for (const comment of context.task.comments.slice(-3)) {
-        prompt += `  - ${comment.authorName}: ${comment.content}\n`;
+      if (context.task.comments.length > 0) {
+        prompt += `- 最近のコメント:\n`;
+        for (const comment of context.task.comments.slice(-3)) {
+          prompt += `  - ${comment.authorName}: ${comment.content}\n`;
+        }
       }
     }
   }
 
-  prompt += `
-## 回答のガイドライン
-- 日本語で回答してください
-- 簡潔で分かりやすい回答を心がけてください
-- タスク管理に関するアドバイスを提供してください
-- 必要に応じてタスクの分解や優先順位付けの提案をしてください
-`;
-
-  if (enableTools) {
+  // Cross-project overview (dashboard)
+  if (!hasProject && context.projects && context.projects.length > 0) {
     prompt += `
+### 参加プロジェクト（${context.projects.length}件）
+`;
+    for (const project of context.projects) {
+      prompt += `- ${project.name}`;
+      if (project.description) {
+        prompt += `: ${project.description}`;
+      }
+      prompt += '\n';
+    }
+  }
+
+  // Tool instructions
+  if (enableTools) {
+    if (hasProject) {
+      prompt += `
 ## ツールの使用（非常に重要）
 
 ### 最重要ルール
@@ -279,6 +340,12 @@ function buildSystemPrompt(context: AIContext, enableTools?: boolean, isPersonal
 | 「〜を別のリストに移動して」 | move_task |
 | 「〜を担当に設定して」 | assign_task |
 
+### クロスプロジェクトツール
+- get_my_tasks_across_projects: 全プロジェクトの自分のタスクを取得
+- get_workload_summary: ワークロードサマリーを取得
+- suggest_work_priority: 作業優先順位を提案
+- generate_daily_report: 日報を生成
+
 ### 具体例
 ✅ 正しい：「完了したタスクは何件？」→ get_project_summary を呼び出し → 結果を回答
 ❌ 間違い：「完了したタスクは何件？」→ create_task({title: "完了タスクを数える"})
@@ -286,90 +353,8 @@ function buildSystemPrompt(context: AIContext, enableTools?: boolean, isPersonal
 ✅ 正しい：「買い物リストを作成して」→ create_task({title: "買い物リスト"})
 ❌ 間違い：「タスクの状況は？」→ create_task({title: "タスク状況を確認"})
 `;
-  }
-
-  return prompt;
-}
-
-/**
- * Build system prompt for personal (cross-project) scope
- */
-function getTimePeriodLabel(hour: number): string {
-  if (hour >= 5 && hour <= 11) return '朝';
-  if (hour >= 12 && hour <= 16) return '午後';
-  if (hour >= 17 && hour <= 23) return '夕方';
-  return '深夜';
-}
-
-function getTimePeriodInstructions(hour: number): string {
-  if (hour >= 5 && hour <= 11) {
-    return `- 元気で前向きな挨拶をしてください
-- タスクの整理と優先順位付けを積極的に提案してください
-- 期限切れや本日期限のタスクがあれば注意喚起してください
-- 「今日も一緒に頑張りましょう！」のような前向きな締めくくりを`;
-  }
-  if (hour >= 12 && hour <= 16) {
-    return `- 午後の進捗を気遣ってください
-- 負荷が高そうなら休憩や優先順位の見直しを提案してください
-- 残りの時間で取り組むべきタスクを整理してください`;
-  }
-  if (hour >= 17 && hour <= 23) {
-    return `- 「お疲れ様です」とねぎらいの言葉から始めてください
-- 日報作成を積極的にサポートしてください
-- 今日の成果を振り返り、達成を認めてください
-- 明日への引き継ぎ事項があれば整理してください`;
-  }
-  return `- 遅い時間の作業をねぎらってください
-- 簡潔にサポートしてください
-- 体調を気遣い、無理しないよう声をかけてください`;
-}
-
-function buildPersonalSystemPrompt(context: AIContext, enableTools?: boolean): string {
-  const currentHour = context.currentHour ?? new Date().getHours();
-  const timePeriodLabel = getTimePeriodLabel(currentHour);
-  const today = new Date();
-  const todayISO = today.toISOString().split('T')[0];
-
-  let prompt = `あなたは「相棒」— ${context.user.displayName}さんの個人タスク管理パートナーです。
-
-## あなたの性格
-- 親しみやすく温かい口調（丁寧なカジュアル体）
-- パートナーとして一緒に仕事を進める姿勢
-- 努力を認め、適度に励ます
-- 問題は一緒に考える
-
-## 現在の時間帯: ${timePeriodLabel}
-${getTimePeriodInstructions(currentHour)}
-
-## 役割
-1. **朝の計画**: タスク整理、優先順位付け、一日の目標設定
-2. **日中のサポート**: 進捗確認、優先順位調整、困りごとの相談
-3. **夕方の振り返り**: 日報生成、成果の振り返り、明日の準備
-
-## 現在のコンテキスト
-
-### 日付情報
-- 今日の日付: ${todayISO}
-
-### ユーザー情報
-- 名前: ${context.user.displayName}
-`;
-
-  if (context.projects && context.projects.length > 0) {
-    prompt += `
-### 参加プロジェクト（${context.projects.length}件）
-`;
-    for (const project of context.projects) {
-      prompt += `- ${project.name}`;
-      if (project.description) {
-        prompt += `: ${project.description}`;
-      }
-      prompt += '\n';
-    }
-  }
-
-  if (enableTools) {
-    prompt += `
+    } else {
+      prompt += `
 ## ツールの使用
 
 積極的にツールを使って情報を取得し、ユーザーに分かりやすく提示してください。
@@ -379,15 +364,25 @@ ${getTimePeriodInstructions(currentHour)}
 - get_workload_summary: ワークロードサマリーを取得
 - suggest_work_priority: 作業優先順位を提案
 - generate_daily_report: 日報を生成
+- update_task: タスクを更新（projectIdパラメータ必須）
+- complete_task: タスクを完了/未完了にする（projectIdパラメータ必須）
+
+### タスク修正の手順（ダッシュボードから）
+1. まず get_my_tasks_across_projects でタスク一覧を取得（各タスクにprojectIdが含まれる）
+2. 取得した projectId と taskId を使って update_task や complete_task を呼ぶ
+
+例：「このタスクを完了にして」→ get_my_tasks_across_projects → complete_task({ projectId: "...", taskId: "...", isCompleted: true })
 `;
+    }
   }
 
   prompt += `
 ## 回答のガイドライン
 - 日本語で回答してください
 - 簡潔で分かりやすい回答を心がけてください
-- プロジェクト横断で優先順位や作業負荷を分析してください
-- 日報やサマリーを出力する際は、マークダウン形式で見やすく整形してください
+- タスク管理に関するアドバイスを提供してください
+- 必要に応じてタスクの分解や優先順位付けの提案をしてください
+${!hasProject ? '- プロジェクト横断で優先順位や作業負荷を分析してください\n- 日報やサマリーを出力する際は、マークダウン形式で見やすく整形してください' : ''}
 `;
 
   return prompt;

@@ -1,50 +1,53 @@
-import { getTool, ToolCall, ToolResult, ToolExecutionContext } from './tools';
+import { getUnifiedTool } from './tools';
+import { ToolCall, ToolResult, ToolExecutionContext } from './tools/types';
 
 /**
- * Execute a single tool call
+ * Execute tool calls using the unified registry.
+ * Handles both project-scope and personal-scope tools.
+ * Project-scope tools require a valid projectId in context.
  */
-export async function executeTool(
-  toolCall: ToolCall,
-  context: ToolExecutionContext
-): Promise<ToolResult> {
-  const tool = getTool(toolCall.name);
-
-  if (!tool) {
-    return {
-      toolCallId: toolCall.id,
-      success: false,
-      error: `Unknown tool: ${toolCall.name}`,
-    };
-  }
-
-  try {
-    const result = await tool.handler(toolCall.arguments, context);
-    return {
-      toolCallId: toolCall.id,
-      success: true,
-      result,
-    };
-  } catch (error) {
-    return {
-      toolCallId: toolCall.id,
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-}
-
-/**
- * Execute multiple tool calls
- */
-export async function executeTools(
+export async function executeUnifiedTools(
   toolCalls: ToolCall[],
   context: ToolExecutionContext
 ): Promise<ToolResult[]> {
   const results: ToolResult[] = [];
 
   for (const toolCall of toolCalls) {
-    const result = await executeTool(toolCall, context);
-    results.push(result);
+    const tool = getUnifiedTool(toolCall.name);
+
+    if (!tool) {
+      results.push({
+        toolCallId: toolCall.id,
+        success: false,
+        error: `Unknown tool: ${toolCall.name}`,
+      });
+      continue;
+    }
+
+    // Safety check: project-scope tools require a valid projectId
+    if (tool.scope === 'project' && !context.projectId) {
+      results.push({
+        toolCallId: toolCall.id,
+        success: false,
+        error: `Tool "${toolCall.name}" requires a project context but no projectId was provided.`,
+      });
+      continue;
+    }
+
+    try {
+      const result = await tool.handler(toolCall.arguments, context);
+      results.push({
+        toolCallId: toolCall.id,
+        success: true,
+        result,
+      });
+    } catch (error) {
+      results.push({
+        toolCallId: toolCall.id,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   }
 
   return results;

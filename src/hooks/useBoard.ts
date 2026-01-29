@@ -17,8 +17,12 @@ import {
   subscribeToProjectTags,
   getTaskChecklists,
   createChecklist,
+  createActivityLog,
 } from '@/lib/firebase/firestore';
+import { useAuthStore } from '@/stores/authStore';
+import { useUndoStore } from '@/stores/undoStore';
 import type { List, Task, Label, Tag } from '@/types';
+import { calculateEffectiveStartDate, recalculateDates } from '@/lib/utils/task';
 
 interface BoardState {
   lists: List[];
@@ -30,6 +34,7 @@ interface BoardState {
 }
 
 export function useBoard(projectId: string | null) {
+  const { firebaseUser, user: authUser } = useAuthStore();
   const [state, setState] = useState<BoardState>({
     lists: [],
     tasks: [],
@@ -86,6 +91,20 @@ export function useBoard(projectId: string | null) {
     [state.tasks]
   );
 
+  // Activity log helper (fire-and-forget)
+  const logActivity = useCallback(
+    (params: Parameters<typeof createActivityLog>[1]) => {
+      if (!projectId) return;
+      createActivityLog(projectId, params).catch(() => {});
+    },
+    [projectId]
+  );
+
+  const getActivityUser = useCallback(() => ({
+    userId: firebaseUser?.uid || '',
+    userName: authUser?.displayName || 'Unknown',
+  }), [firebaseUser, authUser]);
+
   // Create list
   const addList = useCallback(
     async (name: string, color: string) => {
@@ -98,8 +117,16 @@ export function useBoard(projectId: string | null) {
         autoCompleteOnEnter: false,
         autoUncompleteOnExit: false,
       });
+      logActivity({
+        projectId,
+        targetType: 'list',
+        targetId: '',
+        targetName: name,
+        action: 'create',
+        ...getActivityUser(),
+      });
     },
-    [projectId, state.lists]
+    [projectId, state.lists, logActivity, getActivityUser]
   );
 
   // Update list
@@ -196,8 +223,56 @@ export function useBoard(projectId: string | null) {
         isAbandoned: false,
         createdBy,
       });
+      logActivity({
+        projectId,
+        targetType: 'task',
+        targetId: '',
+        targetName: title,
+        action: 'create',
+        ...getActivityUser(),
+      });
     },
-    [projectId, state.tasks, state.lists]
+    [projectId, state.tasks, state.lists, logActivity, getActivityUser]
+  );
+
+  // Cascade date updates to dependent tasks
+  const cascadeDependentDates = useCallback(
+    async (changedTaskId: string, allTasks: Task[]) => {
+      if (!projectId) return;
+
+      // Find tasks that depend on the changed task
+      const dependentTasks = allTasks.filter(
+        (t) => t.dependsOnTaskIds?.includes(changedTaskId)
+      );
+
+      for (const depTask of dependentTasks) {
+        const effectiveStart = calculateEffectiveStartDate(depTask, allTasks);
+        if (!effectiveStart) continue;
+
+        const result = recalculateDates(depTask, { startDate: effectiveStart });
+
+        // Only update if dates actually changed
+        const startChanged = depTask.startDate?.getTime() !== effectiveStart.getTime();
+        const dueChanged = depTask.dueDate?.getTime() !== result.dueDate?.getTime();
+
+        if (startChanged || dueChanged) {
+          const updateData: Partial<Task> = {};
+          if (startChanged) updateData.startDate = effectiveStart;
+          if (dueChanged) updateData.dueDate = result.dueDate;
+          if (result.durationDays !== depTask.durationDays) updateData.durationDays = result.durationDays;
+
+          await updateTask(projectId, depTask.id, updateData);
+
+          // Recursively cascade to tasks that depend on this task
+          const updatedDepTask = { ...depTask, ...updateData };
+          const updatedAllTasks = allTasks.map((t) =>
+            t.id === depTask.id ? updatedDepTask : t
+          );
+          await cascadeDependentDates(depTask.id, updatedAllTasks);
+        }
+      }
+    },
+    [projectId]
   );
 
   // Update task
@@ -207,18 +282,110 @@ export function useBoard(projectId: string | null) {
       data: Partial<Omit<Task, 'id' | 'projectId' | 'createdAt' | 'updatedAt'>>
     ) => {
       if (!projectId) return;
+
+      // Capture old values for undo (only for significant changes)
+      const task = state.tasks.find((t) => t.id === taskId);
+      const isSignificant =
+        'isCompleted' in data || 'priority' in data ||
+        'startDate' in data || 'dueDate' in data ||
+        'title' in data || 'isAbandoned' in data;
+
+      if (task && isSignificant) {
+        const oldData: Partial<Task> = {};
+        for (const key of Object.keys(data) as Array<keyof typeof data>) {
+          (oldData as Record<string, unknown>)[key] = task[key as keyof Task];
+        }
+        const pid = projectId;
+        let description = `「${task.title}」を編集`;
+        if ('isCompleted' in data) {
+          description = data.isCompleted
+            ? `「${task.title}」を完了`
+            : `「${task.title}」を未完了に戻す`;
+        }
+        useUndoStore.getState().pushAction({
+          id: `edit-${taskId}-${Date.now()}`,
+          description,
+          undo: async () => {
+            await updateTask(pid, taskId, oldData);
+          },
+          redo: async () => {
+            await updateTask(pid, taskId, data);
+          },
+        });
+      }
+
       await updateTask(projectId, taskId, data);
+
+      // Cascade: if dates or completion changed, update dependent tasks
+      const dateOrCompletionChanged =
+        'startDate' in data || 'dueDate' in data ||
+        'completedAt' in data || 'isCompleted' in data;
+
+      if (dateOrCompletionChanged) {
+        // Build updated task list with the just-changed task
+        const updatedTasks = state.tasks.map((t) =>
+          t.id === taskId ? { ...t, ...data } : t
+        );
+        cascadeDependentDates(taskId, updatedTasks).catch(console.error);
+      }
     },
-    [projectId]
+    [projectId, state.tasks, cascadeDependentDates]
   );
 
   // Delete task
   const removeTask = useCallback(
     async (taskId: string) => {
       if (!projectId) return;
+      const task = state.tasks.find((t) => t.id === taskId);
       await deleteTask(projectId, taskId);
+      if (task) {
+        // Push undo action to recreate the task
+        const pid = projectId;
+        useUndoStore.getState().pushAction({
+          id: `delete-${taskId}-${Date.now()}`,
+          description: `「${task.title}」を削除`,
+          undo: async () => {
+            await createTask(pid, {
+              listId: task.listId,
+              title: task.title,
+              description: task.description,
+              order: task.order,
+              assigneeIds: [...task.assigneeIds],
+              labelIds: [...task.labelIds],
+              tagIds: [...task.tagIds],
+              dependsOnTaskIds: [...task.dependsOnTaskIds],
+              priority: task.priority,
+              startDate: task.startDate,
+              dueDate: task.dueDate,
+              durationDays: task.durationDays,
+              isDueDateFixed: task.isDueDateFixed,
+              isCompleted: task.isCompleted,
+              completedAt: task.completedAt,
+              isAbandoned: task.isAbandoned,
+              createdBy: task.createdBy,
+            });
+          },
+          redo: async () => {
+            // Re-delete: find the task by title+listId since ID changed after undo
+            const currentTasks = await getProjectTasks(pid);
+            const match = currentTasks.find(
+              (t) => t.title === task.title && t.listId === task.listId
+            );
+            if (match) await deleteTask(pid, match.id);
+          },
+        });
+
+        logActivity({
+          projectId,
+          targetType: 'task',
+          targetId: taskId,
+          targetName: task.title,
+          action: 'delete',
+          ...getActivityUser(),
+        });
+      }
     },
-    [projectId]
+    [projectId, state.tasks, logActivity, getActivityUser]
   );
 
   // Move task to different list
@@ -230,6 +397,12 @@ export function useBoard(projectId: string | null) {
       const task = state.tasks.find((t) => t.id === taskId);
       const oldList = task ? state.lists.find((l) => l.id === task.listId) : null;
       const newList = state.lists.find((l) => l.id === newListId);
+
+      // Capture old state for undo
+      const oldListId = task?.listId;
+      const oldOrder = task?.order;
+      const oldIsCompleted = task?.isCompleted;
+      const oldCompletedAt = task?.completedAt;
 
       // Prepare update data
       const updateData: Partial<Task> = {
@@ -252,8 +425,45 @@ export function useBoard(projectId: string | null) {
       }
 
       await updateTask(projectId, taskId, updateData);
+
+      // Push undo action for cross-list moves
+      if (task && task.listId !== newListId && oldListId !== undefined && oldOrder !== undefined) {
+        const pid = projectId;
+        const oldListName = oldList?.name || '';
+        const newListName = newList?.name || '';
+        useUndoStore.getState().pushAction({
+          id: `move-${taskId}-${Date.now()}`,
+          description: `「${task.title}」を${oldListName}→${newListName}`,
+          undo: async () => {
+            await updateTask(pid, taskId, {
+              listId: oldListId,
+              order: oldOrder,
+              isCompleted: oldIsCompleted,
+              completedAt: oldCompletedAt,
+            });
+          },
+          redo: async () => {
+            await updateTask(pid, taskId, updateData);
+          },
+        });
+      }
+
+      // Log only cross-list moves
+      if (task && task.listId !== newListId) {
+        const oldListName = oldList?.name || '';
+        const newListName = newList?.name || '';
+        logActivity({
+          projectId,
+          targetType: 'task',
+          targetId: taskId,
+          targetName: task.title,
+          action: 'move',
+          ...getActivityUser(),
+          changes: [{ field: 'リスト', oldValue: oldListName, newValue: newListName }],
+        });
+      }
     },
-    [projectId, state.tasks, state.lists]
+    [projectId, state.tasks, state.lists, logActivity, getActivityUser]
   );
 
   // Reorder tasks within a list

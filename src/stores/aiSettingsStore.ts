@@ -5,19 +5,18 @@ import { AIProviderType, DEFAULT_MODELS } from '@/types/ai';
 interface AISettingsState {
   // Current provider
   provider: AIProviderType;
-  // API Keys (stored in localStorage)
-  openaiApiKey: string;
-  anthropicApiKey: string;
-  geminiApiKey: string;
+  // Key status (whether keys are configured server-side)
+  openaiKeyConfigured: boolean;
+  anthropicKeyConfigured: boolean;
+  geminiKeyConfigured: boolean;
   // Models
   openaiModel: string;
   anthropicModel: string;
   geminiModel: string;
   // Actions
   setProvider: (provider: AIProviderType) => void;
-  setApiKey: (provider: AIProviderType, apiKey: string) => void;
+  setKeyConfigured: (provider: AIProviderType, configured: boolean) => void;
   setModel: (provider: AIProviderType, model: string) => void;
-  getActiveApiKey: () => string;
   getActiveModel: () => string;
   isConfigured: () => boolean;
 }
@@ -26,25 +25,25 @@ export const useAISettingsStore = create<AISettingsState>()(
   persist(
     (set, get) => ({
       provider: 'openai',
-      openaiApiKey: '',
-      anthropicApiKey: '',
-      geminiApiKey: '',
+      openaiKeyConfigured: false,
+      anthropicKeyConfigured: false,
+      geminiKeyConfigured: false,
       openaiModel: DEFAULT_MODELS.openai,
       anthropicModel: DEFAULT_MODELS.anthropic,
       geminiModel: DEFAULT_MODELS.gemini,
 
       setProvider: (provider) => set({ provider }),
 
-      setApiKey: (provider, apiKey) => {
+      setKeyConfigured: (provider, configured) => {
         switch (provider) {
           case 'openai':
-            set({ openaiApiKey: apiKey });
+            set({ openaiKeyConfigured: configured });
             break;
           case 'anthropic':
-            set({ anthropicApiKey: apiKey });
+            set({ anthropicKeyConfigured: configured });
             break;
           case 'gemini':
-            set({ geminiApiKey: apiKey });
+            set({ geminiKeyConfigured: configured });
             break;
         }
       },
@@ -63,18 +62,6 @@ export const useAISettingsStore = create<AISettingsState>()(
         }
       },
 
-      getActiveApiKey: () => {
-        const state = get();
-        switch (state.provider) {
-          case 'openai':
-            return state.openaiApiKey;
-          case 'anthropic':
-            return state.anthropicApiKey;
-          case 'gemini':
-            return state.geminiApiKey;
-        }
-      },
-
       getActiveModel: () => {
         const state = get();
         switch (state.provider) {
@@ -88,17 +75,24 @@ export const useAISettingsStore = create<AISettingsState>()(
       },
 
       isConfigured: () => {
-        const apiKey = get().getActiveApiKey();
-        return apiKey.length > 0;
+        const state = get();
+        switch (state.provider) {
+          case 'openai':
+            return state.openaiKeyConfigured;
+          case 'anthropic':
+            return state.anthropicKeyConfigured;
+          case 'gemini':
+            return state.geminiKeyConfigured;
+        }
       },
     }),
     {
       name: 'ai-settings-storage',
       partialize: (state) => ({
         provider: state.provider,
-        openaiApiKey: state.openaiApiKey,
-        anthropicApiKey: state.anthropicApiKey,
-        geminiApiKey: state.geminiApiKey,
+        openaiKeyConfigured: state.openaiKeyConfigured,
+        anthropicKeyConfigured: state.anthropicKeyConfigured,
+        geminiKeyConfigured: state.geminiKeyConfigured,
         openaiModel: state.openaiModel,
         anthropicModel: state.anthropicModel,
         geminiModel: state.geminiModel,

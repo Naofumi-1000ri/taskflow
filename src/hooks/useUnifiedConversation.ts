@@ -3,26 +3,28 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { AIContext, AIMessage } from '@/types/ai';
 import { useAISettingsStore } from '@/stores/aiSettingsStore';
-import { ToolCall, ToolResult } from '@/lib/ai/tools/types';
-import { executeTools, requiresConfirmation } from '@/lib/ai/toolExecutor';
+import { ToolCall } from '@/lib/ai/tools/types';
+import { executeUnifiedTools, requiresConfirmation } from '@/lib/ai/toolExecutor';
 import {
-  createConversation,
-  addMessage as saveMessage,
-  getMessages,
+  createUnifiedConversation,
+  addUnifiedMessage as saveMessage,
+  getUnifiedMessages,
   generateTitleFromMessage,
-  updateConversationTitle,
+  updateUnifiedConversationTitle,
 } from '@/lib/ai/conversationStorage';
+import { getAuthHeaders } from '@/lib/firebase/authToken';
 
-interface UseConversationOptions {
-  projectId: string | null;
+interface UseUnifiedConversationOptions {
   userId: string;
+  projectId: string | null;
+  projectIds?: string[];
   context: AIContext;
   conversationId: string | null;
   onConversationCreated?: (id: string) => void;
   onToolConfirmRequired?: (toolCalls: ToolCall[]) => void;
 }
 
-interface UseConversationReturn {
+interface UseUnifiedConversationReturn {
   messages: AIMessage[];
   isLoading: boolean;
   error: string | null;
@@ -33,16 +35,17 @@ interface UseConversationReturn {
   clearMessages: () => void;
 }
 
-const MAX_TOOL_CHAIN_DEPTH = 5; // Prevent infinite loops
+const MAX_TOOL_CHAIN_DEPTH = 5;
 
-export function useConversation({
-  projectId,
+export function useUnifiedConversation({
   userId,
+  projectId,
+  projectIds,
   context,
   conversationId,
   onConversationCreated,
   onToolConfirmRequired,
-}: UseConversationOptions): UseConversationReturn {
+}: UseUnifiedConversationOptions): UseUnifiedConversationReturn {
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +54,7 @@ export function useConversation({
   const toolChainDepthRef = useRef(0);
   const pendingToolCallsRef = useRef<ToolCall[] | null>(null);
 
-  const { provider, getActiveApiKey, getActiveModel } = useAISettingsStore();
+  const { provider, getActiveModel } = useAISettingsStore();
 
   // Sync conversationId from props
   useEffect(() => {
@@ -63,65 +66,56 @@ export function useConversation({
 
   // Load conversation when ID changes
   useEffect(() => {
-    if (conversationId && projectId) {
+    if (conversationId && userId) {
       loadConversation(conversationId);
     }
-  }, [conversationId, projectId]);
+  }, [conversationId, userId]);
 
   const loadConversation = useCallback(async (convId: string) => {
-    if (!projectId) return;
+    if (!userId) return;
 
     try {
-      const loadedMessages = await getMessages(projectId, convId);
+      const loadedMessages = await getUnifiedMessages(userId, convId);
       setMessages(loadedMessages);
-    } catch (err) {
-      console.error('[Conversation] Failed to load messages:', err);
+    } catch {
+      // Failed to load - will start fresh
     }
-  }, [projectId]);
+  }, [userId]);
 
-  /**
-   * Save a message to Firestore
-   */
   const persistMessage = useCallback(async (
     convId: string,
     message: Omit<AIMessage, 'id' | 'createdAt'>
   ): Promise<string | null> => {
-    if (!projectId) return null;
+    if (!userId) return null;
 
     try {
-      return await saveMessage(projectId, convId, message);
-    } catch (err) {
-      console.error('[Conversation] Failed to save message:', err);
+      return await saveMessage(userId, convId, message);
+    } catch {
       return null;
     }
-  }, [projectId]);
+  }, [userId]);
 
   /**
-   * Call the AI API and process the response
+   * Call the AI API with auth token (API key is retrieved server-side)
    */
   const callAI = useCallback(async (
     messagesToSend: AIMessage[],
     onText: (content: string) => void,
     onToolCalls: (toolCalls: ToolCall[]) => void,
   ): Promise<{ content: string; toolCalls: ToolCall[] | null }> => {
-    const apiKey = getActiveApiKey();
     const model = getActiveModel();
-
-    if (!apiKey) {
-      throw new Error('APIキーが設定されていません。');
-    }
+    const headers = await getAuthHeaders();
 
     const response = await fetch('/api/ai/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         messages: messagesToSend,
         context,
         provider,
-        apiKey,
         model,
         enableTools: true,
-        isPersonalScope: context.scope === 'personal',
+        projectId: projectId || undefined,
       }),
     });
 
@@ -170,35 +164,27 @@ export function useConversation({
     }
 
     return { content: fullContent, toolCalls };
-  }, [context, provider, getActiveApiKey, getActiveModel]);
+  }, [context, provider, getActiveModel, projectId]);
 
-  /**
-   * Process tool calls: execute and send results back to AI
-   */
   const processToolCalls = useCallback(async (
     toolCalls: ToolCall[],
     currentMessages: AIMessage[],
     convId: string,
   ): Promise<void> => {
-    // Check depth limit
     toolChainDepthRef.current++;
     if (toolChainDepthRef.current > MAX_TOOL_CHAIN_DEPTH) {
-      console.warn('[Conversation] Tool chain depth limit reached');
       return;
     }
 
-    console.log('[Conversation] Processing tool calls:', toolCalls.map(t => t.name), 'depth:', toolChainDepthRef.current);
-
-    // Execute tools
     const defaultListId = context.project?.lists[0]?.id;
-    const results = await executeTools(toolCalls, {
-      scope: 'project',
+    const results = await executeUnifiedTools(toolCalls, {
+      scope: projectId ? 'project' : 'personal',
       projectId: projectId || '',
+      projectIds: projectIds,
       userId,
       listId: defaultListId,
     });
 
-    // Update the last assistant message with tool calls
     const updatedMessages = [...currentMessages];
     const lastIndex = updatedMessages.length - 1;
     if (updatedMessages[lastIndex]?.role === 'assistant') {
@@ -213,14 +199,12 @@ export function useConversation({
       };
     }
 
-    // Save assistant message with tool calls
     await persistMessage(convId, {
       role: 'assistant',
       content: updatedMessages[lastIndex]?.content || '',
       toolCalls: updatedMessages[lastIndex]?.toolCalls,
     });
 
-    // Add tool result messages
     const toolResultMessages: AIMessage[] = results.map((result, index) => ({
       id: crypto.randomUUID(),
       role: 'tool' as const,
@@ -231,7 +215,6 @@ export function useConversation({
       thoughtSignature: toolCalls[index].thoughtSignature,
     }));
 
-    // Save tool result messages
     for (const msg of toolResultMessages) {
       await persistMessage(convId, {
         role: msg.role,
@@ -244,7 +227,6 @@ export function useConversation({
 
     const messagesWithToolResults = [...updatedMessages, ...toolResultMessages];
 
-    // Create placeholder for AI response
     const assistantPlaceholder: AIMessage = {
       id: crypto.randomUUID(),
       role: 'assistant',
@@ -254,7 +236,6 @@ export function useConversation({
 
     setMessages([...messagesWithToolResults, assistantPlaceholder]);
 
-    // Call AI with tool results
     const { content, toolCalls: newToolCalls } = await callAI(
       messagesWithToolResults,
       (text) => {
@@ -267,10 +248,9 @@ export function useConversation({
           return updated;
         });
       },
-      (tc) => console.log('[Conversation] Received chained tool calls:', tc.length)
+      () => {}
     );
 
-    // Update final messages
     const finalMessages = [...messagesWithToolResults];
     finalMessages.push({
       id: crypto.randomUUID(),
@@ -280,7 +260,6 @@ export function useConversation({
     });
     setMessages(finalMessages);
 
-    // Handle chained tool calls
     if (newToolCalls && newToolCalls.length > 0) {
       if (requiresConfirmation(newToolCalls)) {
         pendingToolCallsRef.current = newToolCalls;
@@ -289,40 +268,36 @@ export function useConversation({
         await processToolCalls(newToolCalls, finalMessages, convId);
       }
     } else {
-      // No more tool calls - save final assistant message
       if (content) {
         await persistMessage(convId, { role: 'assistant', content });
       }
     }
-  }, [projectId, userId, context, callAI, persistMessage, onToolConfirmRequired]);
+  }, [projectId, projectIds, userId, context, callAI, persistMessage, onToolConfirmRequired]);
 
-  /**
-   * Send a message to the AI
-   */
   const sendMessage = useCallback(async (content: string) => {
-    if (!projectId) return;
+    if (!userId) return;
 
     setIsLoading(true);
     setError(null);
     toolChainDepthRef.current = 0;
 
     try {
-      // Create conversation if needed
       let convId = currentConversationId;
       if (!convId) {
-        convId = await createConversation(projectId, userId, {
-          contextType: context.task ? 'task' : 'project',
-          contextId: context.task?.id || context.project?.id || null,
+        convId = await createUnifiedConversation(userId, {
+          projectId: projectId || null,
+          contextType: projectId
+            ? (context.task ? 'task' : 'project')
+            : 'personal',
+          contextId: context.task?.id || (projectId ? context.project?.id : null) || null,
         });
         setCurrentConversationId(convId);
         onConversationCreated?.(convId);
 
-        // Set title from first message
         const title = generateTitleFromMessage(content);
-        await updateConversationTitle(projectId, convId, title);
+        await updateUnifiedConversationTitle(userId, convId, title);
       }
 
-      // Create user message
       const userMessage: AIMessage = {
         id: crypto.randomUUID(),
         role: 'user',
@@ -330,10 +305,8 @@ export function useConversation({
         createdAt: new Date(),
       };
 
-      // Save user message
       await persistMessage(convId, { role: 'user', content });
 
-      // Create assistant placeholder
       const assistantPlaceholder: AIMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -344,7 +317,6 @@ export function useConversation({
       const newMessages = [...messages, userMessage, assistantPlaceholder];
       setMessages(newMessages);
 
-      // Call AI
       const messagesToSend = [...messages, userMessage];
       const { content: responseContent, toolCalls } = await callAI(
         messagesToSend,
@@ -358,10 +330,9 @@ export function useConversation({
             return updated;
           });
         },
-        (tc) => console.log('[Conversation] Received tool calls:', tc.length)
+        () => {}
       );
 
-      // Update messages with response
       const updatedMessages = [...messages, userMessage];
       updatedMessages.push({
         id: crypto.randomUUID(),
@@ -371,7 +342,6 @@ export function useConversation({
       });
       setMessages(updatedMessages);
 
-      // Handle tool calls
       if (toolCalls && toolCalls.length > 0) {
         if (requiresConfirmation(toolCalls)) {
           pendingToolCallsRef.current = toolCalls;
@@ -380,7 +350,6 @@ export function useConversation({
           await processToolCalls(toolCalls, updatedMessages, convId);
         }
       } else {
-        // No tool calls - save assistant message
         if (responseContent) {
           await persistMessage(convId, { role: 'assistant', content: responseContent });
         }
@@ -388,13 +357,12 @@ export function useConversation({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
-      console.error('[Conversation] Error:', errorMessage);
     } finally {
       setIsLoading(false);
     }
   }, [
-    projectId,
     userId,
+    projectId,
     context,
     currentConversationId,
     messages,
@@ -405,9 +373,6 @@ export function useConversation({
     onToolConfirmRequired,
   ]);
 
-  /**
-   * Confirm and execute pending tool calls
-   */
   const confirmToolExecution = useCallback(async (toolCalls: ToolCall[]) => {
     if (!currentConversationId) return;
 
@@ -423,9 +388,6 @@ export function useConversation({
     }
   }, [currentConversationId, messages, processToolCalls]);
 
-  /**
-   * Cancel pending tool execution
-   */
   const cancelToolExecution = useCallback(() => {
     pendingToolCallsRef.current = null;
     setMessages(prev => {

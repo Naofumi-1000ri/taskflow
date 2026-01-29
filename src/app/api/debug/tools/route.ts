@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getAnthropicTools, getOpenAITools, getAllToolDefinitions } from '@/lib/ai/tools';
+import { getAnthropicTools, getOpenAITools, getToolDefinitions } from '@/lib/ai/tools';
 
 export async function GET() {
-  const allTools = getAllToolDefinitions();
-  const anthropicTools = getAnthropicTools();
-  const openAITools = getOpenAITools();
+  const allTools = getToolDefinitions({ projectId: 'all' });
+  const anthropicTools = getAnthropicTools({ projectId: 'all' });
+  const openAITools = getOpenAITools({ projectId: 'all' });
 
   return NextResponse.json({
     timestamp: new Date().toISOString(),

@@ -43,16 +43,10 @@ export function useAuth() {
   const signInAsTestUser = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('[useAuth] Starting test sign in...');
       const fbUser = await signInWithTestUser();
-      console.log('[useAuth] Firebase auth completed:', fbUser.email);
-      // Explicitly set the user in store (don't wait for onAuthStateChanged)
       setFirebaseUser(fbUser);
-      console.log('[useAuth] setFirebaseUser called');
       const userData = await getUserData(fbUser.uid);
-      console.log('[useAuth] getUserData completed:', userData?.email);
       setUser(userData);
-      console.log('[useAuth] signInAsTestUser completed');
     } catch (error) {
       console.error('Test sign in error:', error);
       throw error;

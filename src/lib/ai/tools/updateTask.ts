@@ -5,6 +5,7 @@ import { recalculateDates } from '@/lib/utils/task';
 
 // Update task argument types
 export interface UpdateTaskArgs {
+  projectId?: string;
   taskId: string;
   title?: string;
   description?: string;
@@ -34,6 +35,10 @@ export const updateTaskToolDefinition: AITool = {
   parameters: {
     type: 'object',
     properties: {
+      projectId: {
+        type: 'string',
+        description: 'タスクが属するプロジェクトのID（ダッシュボードから操作する場合に必要。プロジェクトページでは不要）',
+      },
       taskId: {
         type: 'string',
         description: '更新するタスクのID（必須）',
@@ -88,8 +93,12 @@ export const updateTaskHandler: ToolHandler<UpdateTaskArgs, UpdateTaskResult> = 
   args,
   context
 ) => {
-  const { taskId, title, description, priority, startDate, dueDate, durationDays, isDueDateFixed, dependsOnTaskIds, isCompleted } = args;
-  const { projectId } = context;
+  const { projectId: argsProjectId, taskId, title, description, priority, startDate, dueDate, durationDays, isDueDateFixed, dependsOnTaskIds, isCompleted } = args;
+  const projectId = context.projectId || argsProjectId;
+
+  if (!projectId) {
+    throw new Error('プロジェクトIDが指定されていません。get_my_tasks_across_projects で取得したprojectIdを指定してください。');
+  }
 
   const warnings: string[] = [];
 

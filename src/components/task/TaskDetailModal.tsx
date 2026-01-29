@@ -729,10 +729,17 @@ export function TaskDetailModal({
                                         const tempTask = { ...task!, dependsOnTaskIds: newDeps };
                                         const effectiveStartDate = calculateEffectiveStartDate(tempTask, allTasks);
 
-                                        // Update both dependencies and start date
+                                        // Update both dependencies and start date, recalculating dueDate
                                         const updateData: Partial<Task> = { dependsOnTaskIds: newDeps };
                                         if (effectiveStartDate) {
+                                          const result = recalculateDates(task!, { startDate: effectiveStartDate });
                                           updateData.startDate = effectiveStartDate;
+                                          updateData.dueDate = result.dueDate;
+                                          updateData.durationDays = result.durationDays;
+                                          updateData.isDueDateFixed = result.isDueDateFixed;
+                                          setStartDate(effectiveStartDate);
+                                          setDueDate(result.dueDate || undefined);
+                                          setDurationDays(result.durationDays);
                                         } else if (newDeps.length === 0) {
                                           // If removing all dependencies, keep the current startDate (don't reset it)
                                         }
@@ -822,10 +829,17 @@ export function TaskDetailModal({
                                   const tempTask = { ...task, dependsOnTaskIds: newDeps };
                                   const effectiveStartDate = calculateEffectiveStartDate(tempTask, allTasks);
 
-                                  // Update both dependencies and start date
+                                  // Update both dependencies and start date, recalculating dueDate
                                   const updateData: Partial<Task> = { dependsOnTaskIds: newDeps };
                                   if (effectiveStartDate) {
+                                    const result = recalculateDates(task, { startDate: effectiveStartDate });
                                     updateData.startDate = effectiveStartDate;
+                                    updateData.dueDate = result.dueDate;
+                                    updateData.durationDays = result.durationDays;
+                                    updateData.isDueDateFixed = result.isDueDateFixed;
+                                    setStartDate(effectiveStartDate);
+                                    setDueDate(result.dueDate || undefined);
+                                    setDurationDays(result.durationDays);
                                   }
                                   onUpdate(updateData);
                                 }}

@@ -16,6 +16,7 @@ import {
   Timestamp,
   documentId,
   deleteField,
+  limit as firestoreLimit,
   type DocumentData,
   type QueryConstraint,
 } from 'firebase/firestore';
@@ -32,6 +33,7 @@ import type {
   Attachment,
   User,
   Notification,
+  ActivityLog,
 } from '@/types';
 import { DEFAULT_TAGS } from '@/types';
 
@@ -1108,4 +1110,46 @@ export async function markAllNotificationsAsRead(userId: string): Promise<void> 
 export async function deleteNotification(notificationId: string): Promise<void> {
   const db = getFirebaseDb();
   await deleteDoc(doc(db, 'notifications', notificationId));
+}
+
+// ==================== Activity Log ====================
+
+export async function createActivityLog(
+  projectId: string,
+  data: Omit<ActivityLog, 'id' | 'createdAt'>
+): Promise<string> {
+  const db = getFirebaseDb();
+  const logRef = await addDoc(
+    collection(db, 'projects', projectId, 'activityLogs'),
+    {
+      ...data,
+      createdAt: serverTimestamp(),
+    }
+  );
+  return logRef.id;
+}
+
+export function subscribeToActivityLogs(
+  projectId: string,
+  callback: (logs: ActivityLog[]) => void,
+  maxItems: number = 50
+): () => void {
+  const db = getFirebaseDb();
+  const q = query(
+    collection(db, 'projects', projectId, 'activityLogs'),
+    orderBy('createdAt', 'desc'),
+    firestoreLimit(maxItems)
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const logs = snapshot.docs.map((docSnap) => {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        ...data,
+        createdAt: toDate(data.createdAt),
+      } as ActivityLog;
+    });
+    callback(logs);
+  });
 }
