@@ -332,6 +332,9 @@ export const executeTaskPlanHandler: ToolHandler<
         isCompleted: false,
         completedAt: null,
         isAbandoned: false,
+        isArchived: false,
+        archivedAt: null,
+        archivedBy: null,
         createdBy: userId,
       });
 
@@ -365,6 +368,9 @@ export const executeTaskPlanHandler: ToolHandler<
         isCompleted: false,
         completedAt: null,
         isAbandoned: false,
+        isArchived: false,
+        archivedAt: null,
+        archivedBy: null,
         createdBy: userId,
         createdAt: new Date(),
         updatedAt: new Date(),

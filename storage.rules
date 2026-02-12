@@ -1,0 +1,36 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // 認証チェック
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // 1000ri.jpドメインのユーザーのみ許可
+    function isAllowedDomain() {
+      return request.auth != null &&
+             request.auth.token.email != null &&
+             request.auth.token.email.matches('.*@1000ri\\.jp$');
+    }
+
+    function isAllowedUser() {
+      return isAuthenticated() && isAllowedDomain();
+    }
+
+    // プロジェクト関連ファイル（アイコン、ヘッダー画像、添付ファイル等）
+    match /projects/{projectId}/{allPaths=**} {
+      allow read: if isAllowedUser();
+      allow create, update: if isAllowedUser()
+                            && request.resource.size < 10 * 1024 * 1024;
+      allow delete: if isAllowedUser();
+    }
+
+    // ユーザープロフィール画像
+    match /users/{userId}/{allPaths=**} {
+      allow read: if isAllowedUser();
+      allow create, update: if isAllowedUser() && request.auth.uid == userId
+                            && request.resource.size < 5 * 1024 * 1024;
+      allow delete: if isAllowedUser() && request.auth.uid == userId;
+    }
+  }
+}

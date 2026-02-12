@@ -221,6 +221,9 @@ export function useBoard(projectId: string | null) {
         isCompleted: shouldAutoComplete,
         completedAt: shouldAutoComplete ? new Date() : null,
         isAbandoned: false,
+        isArchived: false,
+        archivedAt: null,
+        archivedBy: null,
         createdBy,
       });
       logActivity({
@@ -362,6 +365,9 @@ export function useBoard(projectId: string | null) {
               isCompleted: task.isCompleted,
               completedAt: task.completedAt,
               isAbandoned: task.isAbandoned,
+              isArchived: false,
+              archivedAt: null,
+              archivedBy: null,
               createdBy: task.createdBy,
             });
           },
@@ -509,6 +515,9 @@ export function useBoard(projectId: string | null) {
         isCompleted: false, // New task starts as incomplete
         completedAt: null,
         isAbandoned: false,
+        isArchived: false,
+        archivedAt: null,
+        archivedBy: null,
         createdBy,
       });
 

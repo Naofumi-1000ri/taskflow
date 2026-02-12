@@ -6,6 +6,7 @@ import { verifyAuthToken, getUserAIApiKey } from '@/lib/firebase/admin';
 // Enable streaming for Vercel
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 interface ChatRequest {
   messages: AIMessage[];
@@ -68,47 +69,49 @@ export async function POST(request: NextRequest) {
     // Get provider and create streaming response
     const aiProvider = getProvider(provider);
 
-    // Create a ReadableStream for SSE
-    const stream = new ReadableStream({
-      async start(controller) {
-        const encoder = new TextEncoder();
+    // Use TransformStream for better streaming control
+    const { readable, writable } = new TransformStream();
+    const writer = writable.getWriter();
+    const encoder = new TextEncoder();
 
-        try {
-          const generator = aiProvider.sendMessage(
-            messages,
-            context,
-            apiKey,
-            model,
-            { enableTools, projectId: projectId ?? undefined }
-          );
+    // Start processing in the background
+    (async () => {
+      try {
+        // Send initial connection message
+        await writer.write(encoder.encode(': connected\n\n'));
 
-          for await (const chunk of generator) {
-            if (chunk.type === 'text') {
-              const data = `data: ${JSON.stringify({ type: 'text', content: chunk.content })}\n\n`;
-              controller.enqueue(encoder.encode(data));
-            } else if (chunk.type === 'tool_calls') {
-              const data = `data: ${JSON.stringify({ type: 'tool_calls', toolCalls: chunk.toolCalls })}\n\n`;
-              controller.enqueue(encoder.encode(data));
-            } else if (chunk.type === 'done') {
-              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-            }
+        const generator = aiProvider.sendMessage(
+          messages,
+          context,
+          apiKey,
+          model,
+          { enableTools, projectId: projectId ?? undefined }
+        );
+
+        for await (const chunk of generator) {
+          if (chunk.type === 'text') {
+            const data = `data: ${JSON.stringify({ type: 'text', content: chunk.content })}\n\n`;
+            await writer.write(encoder.encode(data));
+          } else if (chunk.type === 'tool_calls') {
+            const data = `data: ${JSON.stringify({ type: 'tool_calls', toolCalls: chunk.toolCalls })}\n\n`;
+            await writer.write(encoder.encode(data));
+          } else if (chunk.type === 'done') {
+            await writer.write(encoder.encode('data: [DONE]\n\n'));
           }
-
-          controller.close();
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : 'Unknown error';
-          const errorData = `data: ${JSON.stringify({ error: errorMessage })}\n\n`;
-          controller.enqueue(encoder.encode(errorData));
-          controller.close();
         }
-      },
-    });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorData = `data: ${JSON.stringify({ error: errorMessage })}\n\n`;
+        await writer.write(encoder.encode(errorData));
+      } finally {
+        await writer.close();
+      }
+    })();
 
-    return new Response(stream, {
+    return new Response(readable, {
       headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-store, no-transform, must-revalidate',
         'Connection': 'keep-alive',
         'X-Accel-Buffering': 'no',
       },

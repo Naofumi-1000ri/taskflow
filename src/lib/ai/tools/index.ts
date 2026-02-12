@@ -12,6 +12,8 @@ import {
 import {
   deleteTaskToolDefinition,
   deleteTaskHandler,
+  restoreTaskToolDefinition,
+  restoreTaskHandler,
 } from './deleteTask';
 import {
   completeTaskToolDefinition,
@@ -20,6 +22,8 @@ import {
   moveTaskHandler,
   assignTaskToolDefinition,
   assignTaskHandler,
+  copyTaskToProjectToolDefinition,
+  copyTaskToProjectHandler,
 } from './taskTools';
 import {
   getTasksToolDefinition,
@@ -103,6 +107,12 @@ unifiedToolRegistry.set('delete_task', {
   scope: 'project',
 });
 
+unifiedToolRegistry.set('restore_task', {
+  definition: restoreTaskToolDefinition,
+  handler: restoreTaskHandler as unknown as ToolHandler,
+  scope: 'project',
+});
+
 unifiedToolRegistry.set('complete_task', {
   definition: completeTaskToolDefinition,
   handler: completeTaskHandler as unknown as ToolHandler,
@@ -119,6 +129,12 @@ unifiedToolRegistry.set('assign_task', {
   definition: assignTaskToolDefinition,
   handler: assignTaskHandler as unknown as ToolHandler,
   scope: 'project',
+});
+
+unifiedToolRegistry.set('copy_task_to_project', {
+  definition: copyTaskToProjectToolDefinition,
+  handler: copyTaskToProjectHandler as unknown as ToolHandler,
+  scope: 'both', // Can be used from both project and personal contexts
 });
 
 // Query Tools (Read-only)

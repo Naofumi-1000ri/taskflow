@@ -1,4 +1,12 @@
-import { updateTask, getTask, getProjectLists } from '@/lib/firebase/firestore';
+import {
+  updateTask,
+  getTask,
+  getProjectLists,
+  createTask,
+  getTaskAttachments,
+  createAttachment,
+  getProject,
+} from '@/lib/firebase/firestore';
 import { AITool, ToolHandler } from './types';
 
 // ============================================
@@ -202,5 +210,154 @@ export const assignTaskHandler: ToolHandler<AssignTaskArgs, AssignTaskResult> = 
     title: task.title,
     assigneeIds,
     success: true,
+  };
+};
+
+// ============================================
+// copy_task_to_project
+// ============================================
+
+export interface CopyTaskToProjectArgs {
+  sourceProjectId: string;
+  taskId: string;
+  targetProjectId: string;
+  targetListId?: string;
+  includeAttachments?: boolean;
+}
+
+export interface CopyTaskToProjectResult {
+  success: boolean;
+  sourceTaskId: string;
+  newTaskId: string;
+  sourceProjectName: string;
+  targetProjectName: string;
+  targetListName: string;
+  copiedAttachments: number;
+  title: string;
+}
+
+export const copyTaskToProjectToolDefinition: AITool = {
+  name: 'copy_task_to_project',
+  description:
+    '別のプロジェクトにタスクをコピーします。添付ファイルも一緒にコピーできます。元のタスクは残ります。',
+  parameters: {
+    type: 'object',
+    properties: {
+      sourceProjectId: {
+        type: 'string',
+        description: 'コピー元のプロジェクトID（必須）',
+      },
+      taskId: {
+        type: 'string',
+        description: 'コピーするタスクのID（必須）',
+      },
+      targetProjectId: {
+        type: 'string',
+        description: 'コピー先のプロジェクトID（必須）',
+      },
+      targetListId: {
+        type: 'string',
+        description: 'コピー先のリストID（省略時は最初のリスト）',
+      },
+      includeAttachments: {
+        type: 'boolean',
+        description: '添付ファイルもコピーするか（デフォルト: true）',
+      },
+    },
+    required: ['sourceProjectId', 'taskId', 'targetProjectId'],
+  },
+};
+
+export const copyTaskToProjectHandler: ToolHandler<CopyTaskToProjectArgs, CopyTaskToProjectResult> = async (
+  args,
+  context
+) => {
+  const {
+    sourceProjectId,
+    taskId,
+    targetProjectId,
+    targetListId,
+    includeAttachments = true,
+  } = args;
+
+  // Verify source task exists
+  const sourceTask = await getTask(sourceProjectId, taskId);
+  if (!sourceTask) {
+    throw new Error('コピー元のタスクが見つかりません');
+  }
+
+  // Get project info
+  const sourceProject = await getProject(sourceProjectId);
+  const targetProject = await getProject(targetProjectId);
+  if (!targetProject) {
+    throw new Error('コピー先のプロジェクトが見つかりません');
+  }
+
+  // Get target list
+  const targetLists = await getProjectLists(targetProjectId);
+  if (targetLists.length === 0) {
+    throw new Error('コピー先のプロジェクトにリストがありません');
+  }
+
+  let selectedList = targetLists[0];
+  if (targetListId) {
+    const foundList = targetLists.find(l => l.id === targetListId);
+    if (!foundList) {
+      throw new Error('指定されたリストが見つかりません');
+    }
+    selectedList = foundList;
+  }
+
+  // Create new task in target project
+  const newTaskData = {
+    title: sourceTask.title,
+    description: sourceTask.description || '',
+    listId: selectedList.id,
+    order: Date.now(),
+    priority: sourceTask.priority || 'medium',
+    labelIds: [], // Labels may not exist in target project
+    assigneeIds: [], // Assignees may not be members of target project
+    tagIds: [],
+    dependsOnTaskIds: [],
+    dueDate: sourceTask.dueDate || null,
+    startDate: sourceTask.startDate || null,
+    durationDays: sourceTask.durationDays || null,
+    isDueDateFixed: sourceTask.isDueDateFixed || false,
+    isCompleted: false,
+    completedAt: null,
+    isAbandoned: false,
+    isArchived: false,
+    archivedAt: null,
+    archivedBy: null,
+    createdBy: context.userId,
+  };
+
+  const newTaskId = await createTask(targetProjectId, newTaskData);
+
+  // Copy attachments if requested
+  let copiedAttachments = 0;
+  if (includeAttachments) {
+    const attachments = await getTaskAttachments(sourceProjectId, taskId);
+    for (const attachment of attachments) {
+      await createAttachment(targetProjectId, newTaskId, {
+        name: attachment.name,
+        url: attachment.url, // Reference same file URL
+        type: attachment.type,
+        size: attachment.size,
+        uploadedBy: context.userId,
+      });
+      copiedAttachments++;
+    }
+  }
+
+  return {
+    success: true,
+    sourceTaskId: taskId,
+    newTaskId,
+    sourceProjectName: sourceProject?.name || sourceProjectId,
+    targetProjectName: targetProject.name,
+    targetListName: selectedList.name,
+    copiedAttachments,
+    title: sourceTask.title,
   };
 };

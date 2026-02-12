@@ -131,17 +131,25 @@ export function useUnifiedConversation({
     const decoder = new TextDecoder();
     let fullContent = '';
     let toolCalls: ToolCall[] | null = null;
+    let buffer = ''; // Buffer for incomplete lines across chunks
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const chunk = decoder.decode(value);
-      const lines = chunk.split('\n').filter(line => line.trim() !== '');
+      const chunk = decoder.decode(value, { stream: true });
+      buffer += chunk;
+
+      // Split by newlines but keep the last incomplete line in buffer
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep the last (potentially incomplete) line
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6);
+        const trimmedLine = line.trim();
+        if (!trimmedLine) continue;
+
+        if (trimmedLine.startsWith('data: ')) {
+          const data = trimmedLine.slice(6);
           if (data === '[DONE]') continue;
 
           try {
@@ -159,9 +167,36 @@ export function useUnifiedConversation({
               onToolCalls(parsed.toolCalls as ToolCall[]);
             }
           } catch (e) {
-            if (e instanceof Error && e.message !== 'Unexpected end of JSON input') {
+            // Ignore JSON parse errors for incomplete data (can happen at chunk boundaries)
+            const errorMsg = e instanceof Error ? e.message : '';
+            const isIncompleteJson = errorMsg.includes('Unexpected end') ||
+                                      errorMsg.includes('Unterminated string') ||
+                                      errorMsg.includes('Unexpected token');
+            if (!isIncompleteJson) {
               throw e;
             }
+          }
+        }
+      }
+    }
+
+    // Process any remaining data in buffer
+    if (buffer.trim()) {
+      const trimmedLine = buffer.trim();
+      if (trimmedLine.startsWith('data: ')) {
+        const data = trimmedLine.slice(6);
+        if (data !== '[DONE]') {
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.type === 'text' && parsed.content) {
+              fullContent += parsed.content;
+              onText(fullContent);
+            } else if (parsed.type === 'tool_calls' && parsed.toolCalls) {
+              toolCalls = parsed.toolCalls;
+              onToolCalls(parsed.toolCalls as ToolCall[]);
+            }
+          } catch {
+            // Ignore final incomplete JSON
           }
         }
       }

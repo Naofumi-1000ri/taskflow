@@ -8,7 +8,10 @@ export function createImage(url: string): Promise<HTMLImageElement> {
     const image = new Image();
     image.addEventListener('load', () => resolve(image));
     image.addEventListener('error', (error) => reject(error));
-    image.setAttribute('crossOrigin', 'anonymous');
+    // Only set crossOrigin for remote URLs (not data URLs or blob URLs)
+    if (!url.startsWith('data:') && !url.startsWith('blob:')) {
+      image.setAttribute('crossOrigin', 'anonymous');
+    }
     image.src = url;
   });
 }
@@ -60,6 +63,12 @@ export async function getCroppedImg(
   // Set canvas size to desired output size
   canvas.width = outputWidth;
   canvas.height = outputHeight;
+
+  // Fill with white background (JPEG doesn't support transparency - transparent pixels become black)
+  if (mimeType === 'image/jpeg') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, outputWidth, outputHeight);
+  }
 
   // Draw the cropped image scaled to output size
   ctx.drawImage(

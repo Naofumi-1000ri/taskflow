@@ -417,7 +417,7 @@ export function BoardView({ projectId, onTaskClick, filters }: BoardViewProps) {
       onDragEnd={handleDragEnd}
     >
       <div className="pb-4" data-testid="board-view">
-        <div className="flex min-w-max gap-4">
+        <div className="flex w-fit gap-4">
           <SortableContext
             items={displayLists.map((l) => l.id)}
             strategy={horizontalListSortingStrategy}

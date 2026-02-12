@@ -427,6 +427,42 @@ export async function updateTask(
   });
 }
 
+/**
+ * Archive a task (soft delete) - task is hidden but can be restored
+ */
+export async function archiveTask(
+  projectId: string,
+  taskId: string,
+  userId: string
+): Promise<void> {
+  const db = getFirebaseDb();
+  await updateDoc(doc(db, 'projects', projectId, 'tasks', taskId), {
+    isArchived: true,
+    archivedAt: serverTimestamp(),
+    archivedBy: userId,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Restore an archived task
+ */
+export async function restoreTask(
+  projectId: string,
+  taskId: string
+): Promise<void> {
+  const db = getFirebaseDb();
+  await updateDoc(doc(db, 'projects', projectId, 'tasks', taskId), {
+    isArchived: false,
+    archivedAt: null,
+    archivedBy: null,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Permanently delete a task (use with caution - prefer archiveTask)
+ */
 export async function deleteTask(
   projectId: string,
   taskId: string
@@ -462,14 +498,16 @@ export async function getProjectTasks(projectId: string): Promise<Task[]> {
     collection(db, 'projects', projectId, 'tasks')
   );
 
-  return snapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      ...convertDoc<Task>(data, doc.id),
-      startDate: data.startDate ? toDate(data.startDate) : null,
-      dueDate: data.dueDate ? toDate(data.dueDate) : null,
-    };
-  });
+  return snapshot.docs
+    .map((doc) => {
+      const data = doc.data();
+      return {
+        ...convertDoc<Task>(data, doc.id),
+        startDate: data.startDate ? toDate(data.startDate) : null,
+        dueDate: data.dueDate ? toDate(data.dueDate) : null,
+      };
+    })
+    .filter((task) => !task.isArchived); // Filter out archived tasks
 }
 
 export function subscribeToProjectTasks(
@@ -481,17 +519,70 @@ export function subscribeToProjectTasks(
   return onSnapshot(
     collection(db, 'projects', projectId, 'tasks'),
     (snapshot) => {
-      const tasks = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          ...convertDoc<Task>(data, doc.id),
-          startDate: data.startDate ? toDate(data.startDate) : null,
-          dueDate: data.dueDate ? toDate(data.dueDate) : null,
-        };
-      });
+      const tasks = snapshot.docs
+        .map((doc) => {
+          const data = doc.data();
+          return {
+            ...convertDoc<Task>(data, doc.id),
+            startDate: data.startDate ? toDate(data.startDate) : null,
+            dueDate: data.dueDate ? toDate(data.dueDate) : null,
+          };
+        })
+        .filter((task) => !task.isArchived); // Filter out archived tasks
       callback(tasks);
     }
   );
+}
+
+/**
+ * Get archived tasks for a project
+ */
+export async function getArchivedTasks(projectId: string): Promise<Task[]> {
+  const db = getFirebaseDb();
+  const q = query(
+    collection(db, 'projects', projectId, 'tasks'),
+    where('isArchived', '==', true),
+    orderBy('archivedAt', 'desc')
+  );
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      ...convertDoc<Task>(data, doc.id),
+      startDate: data.startDate ? toDate(data.startDate) : null,
+      dueDate: data.dueDate ? toDate(data.dueDate) : null,
+      archivedAt: data.archivedAt ? toDate(data.archivedAt) : null,
+    };
+  });
+}
+
+/**
+ * Subscribe to archived tasks for a project
+ */
+export function subscribeToArchivedTasks(
+  projectId: string,
+  callback: (tasks: Task[]) => void
+): () => void {
+  const db = getFirebaseDb();
+  const q = query(
+    collection(db, 'projects', projectId, 'tasks'),
+    where('isArchived', '==', true),
+    orderBy('archivedAt', 'desc')
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const tasks = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        ...convertDoc<Task>(data, doc.id),
+        startDate: data.startDate ? toDate(data.startDate) : null,
+        dueDate: data.dueDate ? toDate(data.dueDate) : null,
+        archivedAt: data.archivedAt ? toDate(data.archivedAt) : null,
+      };
+    });
+    callback(tasks);
+  });
 }
 
 // ==================== Labels ====================

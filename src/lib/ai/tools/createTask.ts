@@ -212,6 +212,9 @@ export const createTaskHandler: ToolHandler<CreateTaskArgs, CreateTaskResult> = 
     isCompleted: false,
     completedAt: null,
     isAbandoned: false,
+    isArchived: false,
+    archivedAt: null,
+    archivedBy: null,
     createdBy: userId,
   });
 

@@ -22,6 +22,12 @@ import {
   DropdownMenuSubContent,
   DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { TaskCard } from './TaskCard';
 import { cn } from '@/lib/utils';
 import type { List, Task, Label, Tag } from '@/types';
@@ -264,27 +270,46 @@ export function BoardList({
       </div>
 
       {/* Tasks */}
-      <div
-        ref={setDroppableNodeRef}
-        className="min-h-[40px] flex-1 space-y-2 px-3 pb-3"
-      >
-        <SortableContext
-          items={tasks.map((t) => t.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          {tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              projectId={projectId}
-              task={task}
-              labels={labels}
-              tags={tags}
-              allTasks={allTasks}
-              onClick={() => onTaskClick(task.id)}
-            />
-          ))}
-        </SortableContext>
-      </div>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div
+            ref={setDroppableNodeRef}
+            className="min-h-[40px] flex-1 space-y-2 px-3 pb-3"
+          >
+            <SortableContext
+              items={tasks.map((t) => t.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {tasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  projectId={projectId}
+                  task={task}
+                  labels={labels}
+                  tags={tags}
+                  allTasks={allTasks}
+                  onClick={() => onTaskClick(task.id)}
+                />
+              ))}
+            </SortableContext>
+
+            {/* Add Task Button - After last task */}
+            <button
+              onClick={() => setIsAddingTask(true)}
+              className="flex w-full items-center gap-1 rounded-md py-1.5 text-sm text-gray-400 transition-colors hover:text-gray-600"
+            >
+              <Plus className="h-4 w-4" />
+              <span>タスクを追加</span>
+            </button>
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onClick={() => setIsAddingTask(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            新規タスク
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     </div>
   );
 }
