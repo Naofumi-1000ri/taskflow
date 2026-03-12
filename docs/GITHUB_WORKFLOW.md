@@ -84,6 +84,8 @@ Suggested automation rules:
 - PR in review moves Issue to `Review`
 - merged PR closes Issue and moves it to `Done`
 
+For TaskFlow board items that are synced into GitHub Issues, follow the triage rules in [`TASKFLOW_GITHUB_TRIAGE.md`](./TASKFLOW_GITHUB_TRIAGE.md) before implementation starts.
+
 ## Branch Protection
 
 Configure branch protection for `main` with:
@@ -154,6 +156,13 @@ Manual rules:
 - move an issue to `In Progress` when implementation starts, not when it is merely discussed
 - move an issue to `Review` when the linked PR is open
 - move an issue to `Done` only after the change is merged or intentionally completed without code
+
+TaskFlow-imported Issues should not move to `Ready` until they have an explicit `AI triage` comment that classifies them as:
+
+- `already implemented`
+- `partially implemented`
+- `reproducible gap`
+- `needs clarification`
 
 Automation candidates to revisit later:
 
