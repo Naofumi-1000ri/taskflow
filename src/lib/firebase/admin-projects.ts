@@ -1,4 +1,4 @@
-import type { Priority, Task } from '@/types';
+import type { CommentAttachment, Priority, Task } from '@/types';
 import { checkDeadlineOverdue, validateTask } from '@/lib/ai/tools/validation';
 import { calculateEffectiveStartDate, recalculateDates } from '@/lib/utils/task';
 import { getAdminDb } from './admin';
@@ -75,6 +75,17 @@ export interface ProjectTaskItem {
   startDate: string | null;
   dueDate: string | null;
   isCompleted: boolean;
+  updatedAt: string | null;
+}
+
+export interface ProjectTaskCommentItem {
+  id: string;
+  taskId: string;
+  content: string;
+  authorId: string;
+  mentions: string[];
+  attachments: CommentAttachment[];
+  createdAt: string | null;
   updatedAt: string | null;
 }
 
@@ -187,6 +198,39 @@ function mapTaskToApiItem(task: Task): ProjectTaskItem {
     dueDate: task.dueDate ? task.dueDate.toISOString() : null,
     isCompleted: task.isCompleted,
     updatedAt: task.updatedAt ? task.updatedAt.toISOString() : null,
+  };
+}
+
+function mapCommentToApiItem(
+  taskId: string,
+  commentId: string,
+  data: Record<string, unknown>
+): ProjectTaskCommentItem {
+  return {
+    id: commentId,
+    taskId,
+    content: typeof data.content === 'string' ? data.content : '',
+    authorId: typeof data.authorId === 'string' ? data.authorId : '',
+    mentions:
+      Array.isArray(data.mentions) && data.mentions.every((item) => typeof item === 'string')
+        ? data.mentions
+        : [],
+    attachments:
+      Array.isArray(data.attachments) &&
+      data.attachments.every(
+        (item) =>
+          typeof item === 'object' &&
+          item !== null &&
+          typeof item.id === 'string' &&
+          typeof item.name === 'string' &&
+          typeof item.url === 'string' &&
+          typeof item.type === 'string' &&
+          typeof item.size === 'number'
+      )
+        ? (data.attachments as CommentAttachment[])
+        : [],
+    createdAt: toIsoString(data.createdAt),
+    updatedAt: toIsoString(data.updatedAt),
   };
 }
 
@@ -637,5 +681,48 @@ export async function restoreProjectTask(
 
   return {
     task: mapTaskToApiItem(task),
+  };
+}
+
+export async function createProjectTaskComment(
+  projectId: string,
+  taskId: string,
+  userId: string,
+  input: {
+    content: string;
+    mentions?: string[];
+  }
+): Promise<{ comment: ProjectTaskCommentItem }> {
+  const db = getAdminDb();
+  const existingTask = await getProjectTaskInternal(projectId, taskId);
+
+  if (!existingTask || existingTask.isArchived) {
+    throw new Error('NOT_FOUND');
+  }
+
+  const now = new Date();
+  const commentRef = await db
+    .collection('projects')
+    .doc(projectId)
+    .collection('tasks')
+    .doc(taskId)
+    .collection('comments')
+    .add({
+      taskId,
+      content: input.content,
+      authorId: userId,
+      mentions: input.mentions ?? [],
+      attachments: [],
+      createdAt: now,
+      updatedAt: now,
+    });
+
+  const commentSnapshot = await commentRef.get();
+  if (!commentSnapshot.exists) {
+    throw new Error('COMMENT_CREATE_FAILED');
+  }
+
+  return {
+    comment: mapCommentToApiItem(taskId, commentSnapshot.id, commentSnapshot.data() as Record<string, unknown>),
   };
 }

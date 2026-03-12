@@ -117,6 +117,20 @@ Supports partial update of:
 - isDueDateFixed
 - isCompleted
 
+### `POST /api/projects/[projectId]/tasks/[taskId]/comments`
+
+Requires `tasks:write` and non-viewer project membership.
+
+Supports:
+
+- content
+- mentions
+
+Notes:
+
+- comment author is always the authenticated user
+- attachments are not yet supported through the public API
+
 ### `DELETE /api/projects/[projectId]/tasks/[taskId]`
 
 Archives the task. This is a soft delete.
