@@ -41,6 +41,13 @@ Every pull request should include:
 
 Keep unrelated refactors out of the same pull request.
 
+If a GitHub Issue originated from a TaskFlow board task:
+
+- inspect the current implementation first
+- do not mirror the wording blindly
+- leave an `AI triage` comment before implementation
+- close it immediately if it is already implemented on current `main`
+
 Current single-operator rule:
 
 - PRs are still required before merge
@@ -80,3 +87,5 @@ When changing APIs or Firebase data shapes:
 - update the implementation
 - update docs or usage examples
 - call out compatibility concerns in the PR
+
+See [`docs/TASKFLOW_GITHUB_TRIAGE.md`](./docs/TASKFLOW_GITHUB_TRIAGE.md) for the TaskFlow-to-GitHub backlog handoff rules.

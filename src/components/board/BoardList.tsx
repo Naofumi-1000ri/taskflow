@@ -58,7 +58,7 @@ export function BoardList({
   onDeleteList,
   onTaskClick,
 }: BoardListProps) {
-  const [isAddingTask, setIsAddingTask] = useState(false);
+  const [taskComposerPosition, setTaskComposerPosition] = useState<'top' | 'bottom' | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState(list.name);
@@ -87,11 +87,15 @@ export function BoardList({
     data: { type: 'list', listId: list.id },
   });
 
+  const closeTaskComposer = () => {
+    setNewTaskTitle('');
+    setTaskComposerPosition(null);
+  };
+
   const handleAddTask = () => {
     if (newTaskTitle.trim()) {
       onAddTask(newTaskTitle.trim());
-      setNewTaskTitle('');
-      setIsAddingTask(false);
+      closeTaskComposer();
     }
   };
 
@@ -103,8 +107,7 @@ export function BoardList({
     if (e.key === 'Enter') {
       handleAddTask();
     } else if (e.key === 'Escape') {
-      setNewTaskTitle('');
-      setIsAddingTask(false);
+      closeTaskComposer();
     }
   };
 
@@ -230,9 +233,9 @@ export function BoardList({
         </DropdownMenu>
       </div>
 
-      {/* Add Task - At Top */}
+          {/* Add Task - At Top */}
       <div className="flex-shrink-0 px-3 pb-2">
-        {isAddingTask ? (
+        {taskComposerPosition === 'top' ? (
           <div className="space-y-2 rounded-lg border bg-white p-2">
             <Input
               value={newTaskTitle}
@@ -248,10 +251,7 @@ export function BoardList({
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => {
-                  setNewTaskTitle('');
-                  setIsAddingTask(false);
-                }}
+                onClick={closeTaskComposer}
               >
                 キャンセル
               </Button>
@@ -261,7 +261,7 @@ export function BoardList({
           <Button
             variant="ghost"
             className="w-full justify-start text-primary hover:text-primary"
-            onClick={() => setIsAddingTask(true)}
+            onClick={() => setTaskComposerPosition('top')}
           >
             <Plus className="mr-1 h-4 w-4" />
             タスクを追加
@@ -293,18 +293,41 @@ export function BoardList({
               ))}
             </SortableContext>
 
-            {/* Add Task Button - After last task */}
-            <button
-              onClick={() => setIsAddingTask(true)}
-              className="flex w-full items-center gap-1 rounded-md py-1.5 text-sm text-gray-400 transition-colors hover:text-gray-600"
-            >
-              <Plus className="h-4 w-4" />
-              <span>タスクを追加</span>
-            </button>
+            {taskComposerPosition === 'bottom' ? (
+              <div className="space-y-2 rounded-lg border bg-white p-2">
+                <Input
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="タスク名を入力..."
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={handleAddTask}>
+                    追加
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={closeTaskComposer}
+                  >
+                    キャンセル
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setTaskComposerPosition('bottom')}
+                className="flex w-full items-center gap-1 rounded-md py-1.5 text-sm text-gray-400 transition-colors hover:text-gray-600"
+              >
+                <Plus className="h-4 w-4" />
+                <span>タスクを追加</span>
+              </button>
+            )}
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>
-          <ContextMenuItem onClick={() => setIsAddingTask(true)}>
+          <ContextMenuItem onClick={() => setTaskComposerPosition('bottom')}>
             <Plus className="mr-2 h-4 w-4" />
             新規タスク
           </ContextMenuItem>
