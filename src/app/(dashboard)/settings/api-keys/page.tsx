@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,14 +28,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Key, Plus, Copy, Trash2, Eye, EyeOff, ArrowLeft, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Key, Plus, Copy, Trash2, ArrowLeft, CheckCircle2, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import type { ApiKey, ApiKeyPermission, ApiKeyCreateData } from '@/types/apiKey';
 import { PERMISSION_GROUPS } from '@/types/apiKey';
-import { createApiKey, getUserApiKeys, deactivateApiKey, deleteApiKey } from '@/lib/firebase/apiKeys';
 
 export default function ApiKeysPage() {
-  const { user } = useAuth();
+  const { user, firebaseUser } = useAuth();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -45,29 +44,55 @@ export default function ApiKeysPage() {
   const [newPlainTextKey, setNewPlainTextKey] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
   const [keyToDelete, setKeyToDelete] = useState<ApiKey | null>(null);
-  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    if (user?.id) {
-      loadApiKeys();
+  const getAuthHeaders = useCallback(async () => {
+    if (!firebaseUser) {
+      throw new Error('Not authenticated');
     }
-  }, [user?.id]);
 
-  const loadApiKeys = async () => {
-    if (!user?.id) return;
+    const token = await firebaseUser.getIdToken();
+    return {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+  }, [firebaseUser]);
+
+  const loadApiKeys = useCallback(async () => {
+    if (!user?.id || !firebaseUser) return;
     setIsLoading(true);
     try {
-      const keys = await getUserApiKeys(user.id);
-      setApiKeys(keys);
+      const response = await fetch('/api/auth/tokens', {
+        headers: await getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to load API keys');
+      }
+
+      const data = await response.json() as { apiKeys: ApiKey[] };
+      setApiKeys(
+        data.apiKeys.map((key) => ({
+          ...key,
+          createdAt: new Date(key.createdAt),
+          lastUsedAt: key.lastUsedAt ? new Date(key.lastUsedAt) : null,
+          expiresAt: key.expiresAt ? new Date(key.expiresAt) : null,
+        }))
+      );
     } catch (error) {
       console.error('Failed to load API keys:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [firebaseUser, getAuthHeaders, user?.id]);
+
+  useEffect(() => {
+    if (user?.id && firebaseUser) {
+      loadApiKeys();
+    }
+  }, [firebaseUser, loadApiKeys, user?.id]);
 
   const handleCreateKey = async () => {
-    if (!user?.id || !newKeyName.trim()) return;
+    if (!user?.id || !firebaseUser || !newKeyName.trim()) return;
 
     setIsCreating(true);
     try {
@@ -78,7 +103,21 @@ export default function ApiKeysPage() {
         expiresAt: null, // Never expires for now
       };
 
-      const { plainTextKey } = await createApiKey(user.id, data);
+      const response = await fetch('/api/auth/tokens', {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({
+          ...data,
+          expiresAt: data.expiresAt ? data.expiresAt.toISOString() : null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create API key');
+      }
+
+      const result = await response.json() as { plainTextKey: string };
+      const { plainTextKey } = result;
       setNewPlainTextKey(plainTextKey);
       await loadApiKeys();
     } catch (error) {
@@ -105,9 +144,17 @@ export default function ApiKeysPage() {
   };
 
   const handleDeactivateKey = async (key: ApiKey) => {
-    if (!user?.id) return;
+    if (!user?.id || !firebaseUser) return;
     try {
-      await deactivateApiKey(key.id, user.id);
+      const response = await fetch(`/api/auth/tokens/${key.id}`, {
+        method: 'PATCH',
+        headers: await getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to deactivate API key');
+      }
+
       await loadApiKeys();
     } catch (error) {
       console.error('Failed to deactivate API key:', error);
@@ -115,9 +162,17 @@ export default function ApiKeysPage() {
   };
 
   const handleDeleteKey = async () => {
-    if (!user?.id || !keyToDelete) return;
+    if (!user?.id || !firebaseUser || !keyToDelete) return;
     try {
-      await deleteApiKey(keyToDelete.id, user.id);
+      const response = await fetch(`/api/auth/tokens/${keyToDelete.id}`, {
+        method: 'DELETE',
+        headers: await getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete API key');
+      }
+
       await loadApiKeys();
       setKeyToDelete(null);
     } catch (error) {
@@ -328,20 +383,8 @@ export default function ApiKeysPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <code className="text-sm text-muted-foreground font-mono">
-                          {showKeys[key.id] ? key.keyHash.substring(0, 20) + '...' : key.keyPrefix}
+                          {key.keyPrefix}
                         </code>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => setShowKeys(prev => ({ ...prev, [key.id]: !prev[key.id] }))}
-                        >
-                          {showKeys[key.id] ? (
-                            <EyeOff className="h-3 w-3" />
-                          ) : (
-                            <Eye className="h-3 w-3" />
-                          )}
-                        </Button>
                       </div>
                       <div className="flex flex-wrap gap-1 mt-2">
                         {key.permissions.map((perm) => (

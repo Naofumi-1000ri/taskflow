@@ -10,7 +10,7 @@ import {
   getTaskProgress,
   isTaskOverdue,
 } from './task';
-import type { Task, Priority } from '@/types';
+import type { Task } from '@/types';
 
 // Helper to create mock task
 const createMockTask = (overrides: Partial<Task> = {}): Task => ({

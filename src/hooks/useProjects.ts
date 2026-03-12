@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import {
   createProject,
-  getProject,
   subscribeToProject,
   updateProject,
   deleteProject,
@@ -16,6 +15,7 @@ import {
   removeProjectMember,
   updateMemberRole,
 } from '@/lib/firebase/firestore';
+import { isE2EMockAuthEnabled } from '@/lib/firebase/testMode';
 import type { Project, ProjectMember, ProjectRole, ProjectUrl } from '@/types';
 
 export function useProjects() {
@@ -26,6 +26,15 @@ export function useProjects() {
 
   // Subscribe to user's projects
   useEffect(() => {
+    if (isE2EMockAuthEnabled()) {
+      Promise.resolve().then(() => {
+        setProjects([]);
+        setIsLoading(false);
+        setError(null);
+      });
+      return;
+    }
+
     if (!firebaseUser) {
       Promise.resolve().then(() => {
         setProjects([]);
@@ -149,6 +158,16 @@ export function useProject(projectId: string | null) {
 
   // Subscribe to project for real-time updates
   useEffect(() => {
+    if (isE2EMockAuthEnabled()) {
+      Promise.resolve().then(() => {
+        setProject(null);
+        setMembers([]);
+        setIsLoading(false);
+        setError(null);
+      });
+      return;
+    }
+
     if (!projectId) {
       Promise.resolve().then(() => {
         setProject(null);
@@ -158,8 +177,10 @@ export function useProject(projectId: string | null) {
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
+    Promise.resolve().then(() => {
+      setIsLoading(true);
+      setError(null);
+    });
 
     // Fetch members (one-time)
     getProjectMembers(projectId)

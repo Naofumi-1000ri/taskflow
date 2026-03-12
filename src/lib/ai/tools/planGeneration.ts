@@ -98,7 +98,7 @@ export const generateTaskPlanToolDefinition: AITool = {
 export const generateTaskPlanHandler: ToolHandler<
   GenerateTaskPlanArgs,
   GenerateTaskPlanResult
-> = async (args, context) => {
+> = async (args) => {
   const {
     goal,
     milestones,

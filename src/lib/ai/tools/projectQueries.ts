@@ -11,9 +11,7 @@ import { AITool, ToolHandler } from './types';
 // get_lists - リスト一覧を取得
 // ============================================
 
-export interface GetListsArgs {
-  // No arguments needed
-}
+export type GetListsArgs = Record<string, never>;
 
 export interface ListInfo {
   id: string;
@@ -73,9 +71,7 @@ export const getListsHandler: ToolHandler<GetListsArgs, GetListsResult> = async 
 // get_members - メンバー一覧を取得
 // ============================================
 
-export interface GetMembersArgs {
-  // No arguments needed
-}
+export type GetMembersArgs = Record<string, never>;
 
 export interface MemberInfo {
   id: string;
@@ -135,9 +131,7 @@ export const getMembersHandler: ToolHandler<GetMembersArgs, GetMembersResult> = 
 // get_labels - ラベル一覧を取得
 // ============================================
 
-export interface GetLabelsArgs {
-  // No arguments needed
-}
+export type GetLabelsArgs = Record<string, never>;
 
 export interface LabelInfo {
   id: string;

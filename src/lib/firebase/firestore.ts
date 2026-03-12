@@ -15,10 +15,8 @@ import {
   writeBatch,
   Timestamp,
   documentId,
-  deleteField,
   limit as firestoreLimit,
   type DocumentData,
-  type QueryConstraint,
 } from 'firebase/firestore';
 import { getFirebaseDb } from './config';
 import type {

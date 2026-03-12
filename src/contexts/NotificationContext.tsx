@@ -9,6 +9,7 @@ import {
   createNotification,
 } from '@/lib/firebase/firestore';
 import { useAuthStore } from '@/stores/authStore';
+import { isE2EMockAuthEnabled } from '@/lib/firebase/testMode';
 import type { Notification } from '@/types';
 
 interface NotificationContextType {
@@ -37,9 +38,19 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   // Subscribe to notifications (only once per user)
   useEffect(() => {
+    if (isE2EMockAuthEnabled()) {
+      queueMicrotask(() => {
+        setNotifications([]);
+        setIsLoading(false);
+      });
+      return;
+    }
+
     if (!user?.id) {
-      setNotifications([]);
-      setIsLoading(false);
+      queueMicrotask(() => {
+        setNotifications([]);
+        setIsLoading(false);
+      });
       return;
     }
 
@@ -61,7 +72,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (user?.id) {
       await markAllNotificationsAsRead(user.id);
     }
-  }, [user?.id]);
+  }, [user]);
 
   const remove = useCallback(async (notificationId: string) => {
     await deleteNotification(notificationId);

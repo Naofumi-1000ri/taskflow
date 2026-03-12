@@ -1,0 +1,13 @@
+# Default owners
+* @hgs
+
+# Application code
+/src/ @hgs
+/src/app/api/ @hgs
+/src/lib/auth/ @hgs
+/src/lib/firebase/ @hgs
+
+# Docs and workflow
+/docs/ @hgs
+/.github/ @hgs
+/.github/workflows/ @hgs

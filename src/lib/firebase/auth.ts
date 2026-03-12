@@ -1,7 +1,5 @@
 import {
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
@@ -12,6 +10,7 @@ import {
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseDb } from './config';
 import type { User as AppUser } from '@/types';
+import { isFirebaseTestAuthEnabled } from './testMode';
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -32,19 +31,7 @@ export const TEST_USER = {
 
 // Check if test mode is enabled (only on localhost)
 export function isTestMode(): boolean {
-  if (typeof window === 'undefined') return false;
-  const isLocalhost =
-    window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1';
-  return isLocalhost && process.env.NEXT_PUBLIC_ENABLE_TEST_AUTH === 'true';
-}
-
-// Check if running on mobile device
-function isMobileDevice(): boolean {
-  if (typeof window === 'undefined') return false;
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-    navigator.userAgent
-  );
+  return isFirebaseTestAuthEnabled();
 }
 
 /**

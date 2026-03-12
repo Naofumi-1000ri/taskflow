@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useParams, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, LayoutGrid, GanttChart, Settings, History } from 'lucide-react';
@@ -64,16 +65,18 @@ export default function ProjectLayout({
 
         {/* Header Image or Colored Banner */}
         <div
-          className="w-full overflow-hidden rounded-lg h-[60px] sm:h-[72px] md:h-[90px] lg:h-[108px]"
+          className="relative w-full overflow-hidden rounded-lg h-[60px] sm:h-[72px] md:h-[90px] lg:h-[108px]"
           style={{
             backgroundColor: project.headerImageUrl ? undefined : `${project.color}30`,
           }}
         >
           {project.headerImageUrl && (
-            <img
+            <Image
               src={project.headerImageUrl}
               alt={`${project.name} header`}
-              className="h-full w-full object-cover"
+              fill
+              sizes="100vw"
+              className="object-cover"
             />
           )}
         </div>
@@ -82,11 +85,15 @@ export default function ProjectLayout({
         <div className="absolute -bottom-6 left-3 sm:-bottom-7 sm:left-4 lg:-bottom-8">
           <div className="rounded-full border-2 sm:border-4 border-background bg-background">
             {project.iconUrl ? (
-              <img
-                src={project.iconUrl}
-                alt={project.name}
-                className="h-12 w-12 sm:h-14 sm:w-14 lg:h-16 lg:w-16 rounded-full object-cover"
-              />
+              <div className="relative h-12 w-12 overflow-hidden rounded-full sm:h-14 sm:w-14 lg:h-16 lg:w-16">
+                <Image
+                  src={project.iconUrl}
+                  alt={project.name}
+                  fill
+                  sizes="64px"
+                  className="object-cover"
+                />
+              </div>
             ) : (
               <div
                 className="flex h-12 w-12 sm:h-14 sm:w-14 lg:h-16 lg:w-16 items-center justify-center rounded-full text-xl sm:text-2xl"

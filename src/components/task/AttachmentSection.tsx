@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -14,7 +15,6 @@ import {
   FileSpreadsheet,
   File,
   Download,
-  X,
   Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -157,11 +157,13 @@ export function AttachmentSection({
               >
                 {/* Preview or Icon */}
                 {isImage(attachment.type) ? (
-                  <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded">
-                    <img
+                  <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded">
+                    <Image
                       src={attachment.url}
                       alt={attachment.name}
-                      className="h-full w-full object-cover"
+                      fill
+                      sizes="40px"
+                      className="object-cover"
                     />
                   </div>
                 ) : (

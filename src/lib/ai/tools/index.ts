@@ -1,4 +1,4 @@
-import { AITool, RegisteredTool, ToolHandler, ToolScope } from './types';
+import { AITool, RegisteredTool, ToolHandler } from './types';
 import {
   createTaskToolDefinition,
   createTasksToolDefinition,

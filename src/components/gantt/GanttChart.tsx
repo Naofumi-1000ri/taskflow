@@ -10,9 +10,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { differenceInDays, startOfDay, addDays } from 'date-fns';
-import { Calendar, ChevronLeft, ChevronRight, Circle, Check, GripVertical, Filter, Eye, EyeOff, X } from 'lucide-react';
+import { addDays, differenceInDays, startOfDay } from 'date-fns';
+import { Calendar, Check, Filter, Eye, EyeOff, X } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Popover,
@@ -29,7 +28,6 @@ import {
   getTodayPosition,
   formatTaskDate,
   type ViewMode,
-  type DateColumn,
   type TaskBarResult,
 } from '@/lib/utils/gantt';
 import type { Task, List, Label } from '@/types';
@@ -66,7 +64,6 @@ export function GanttChart({
   const scrollRef = useRef<HTMLDivElement>(null);
   const sidebarTasksRef = useRef<HTMLDivElement>(null);
   const timelineTasksRef = useRef<HTMLDivElement>(null);
-  const [scrollLeft, setScrollLeft] = useState(0);
   const isScrollSyncing = useRef(false);
 
   // Responsive sidebar width
@@ -105,15 +102,6 @@ export function GanttChart({
       colors[list.id] = list.color;
     });
     return colors;
-  }, [lists]);
-
-  // Get list names map
-  const listNames = useMemo(() => {
-    const names: Record<string, string> = {};
-    lists.forEach((list) => {
-      names[list.id] = list.name;
-    });
-    return names;
   }, [lists]);
 
   // Calculate date range and columns
@@ -210,27 +198,6 @@ export function GanttChart({
 
   // Check if any filter is active
   const hasActiveFilter = !showCompleted || selectedListIds.size > 0;
-
-  // Helper: calculate X position for a date (center of that day's cell)
-  const getDateCenterX = (date: Date): number => {
-    let unitDivisor: number;
-    switch (viewMode) {
-      case 'day':
-        unitDivisor = 1;
-        break;
-      case 'week':
-        unitDivisor = 7;
-        break;
-      case 'month':
-        unitDivisor = 30;
-        break;
-    }
-    // Use startOfDay for consistent calculation
-    const daysDiff = differenceInDays(startOfDay(date), startOfDay(rangeStart));
-    const offset = daysDiff / unitDivisor;
-    // Return center of the cell: left edge + half width
-    return offset * columnWidth + columnWidth / 2;
-  };
 
   // Calculate task positions for dependency arrows (including predicted positions)
   const taskPositions = useMemo(() => {
@@ -330,7 +297,6 @@ export function GanttChart({
   };
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    setScrollLeft(e.currentTarget.scrollLeft);
     // Sync horizontal scroll with timeline tasks
     if (timelineTasksRef.current) {
       timelineTasksRef.current.scrollLeft = e.currentTarget.scrollLeft;
@@ -962,7 +928,7 @@ export function GanttChart({
               </svg>
 
               {/* Task Bars */}
-              {filteredTasks.map((task, index) => {
+              {filteredTasks.map((task) => {
                 const position = taskPositions[task.id];
                 const bar = position?.bar;
                 const isPredicted = position?.isPredicted ?? false;

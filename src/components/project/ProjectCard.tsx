@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { MoreHorizontal, Users, Archive, Trash2, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -44,9 +45,11 @@ export function ProjectCard({
           className="flex items-center gap-3"
         >
           {project.iconUrl ? (
-            <img
+            <Image
               src={project.iconUrl}
               alt={project.name}
+              width={40}
+              height={40}
               className="h-10 w-10 rounded-lg object-cover"
             />
           ) : (

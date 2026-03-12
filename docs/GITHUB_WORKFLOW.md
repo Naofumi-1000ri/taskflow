@@ -1,0 +1,187 @@
+# GitHub Workflow
+
+This repository uses GitHub as the source of truth for code review, planning, and release coordination.
+
+## Branch Model
+
+- `main` is the canonical branch
+- all changes land through pull requests
+- do not push directly to `main`
+
+Recommended branch naming:
+
+- `feature/<short-name>`
+- `fix/<short-name>`
+- `chore/<short-name>`
+- `docs/<short-name>`
+- `codex/<short-name>` for Codex-created working branches
+
+## Pull Request Rules
+
+Every pull request should:
+
+- link to an Issue
+- describe the problem and scope
+- include verification steps
+- note any follow-up work
+
+Preferred PR size:
+
+- small enough for a single focused review
+- ideally one concern per PR
+
+## Label Set
+
+Suggested baseline labels:
+
+- `feature`
+- `bug`
+- `tech-debt`
+- `docs`
+- `api`
+- `frontend`
+- `backend`
+- `firebase`
+- `security`
+- `breaking-change`
+- `needs-design`
+- `needs-product`
+- `blocked`
+
+Use labels for filtering and triage, not as a replacement for a clear issue description.
+
+## Milestones
+
+Use milestones for release or theme-based grouping.
+
+Recommended milestone types:
+
+- release milestone
+- integration milestone
+- platform hardening milestone
+
+Examples:
+
+- `v0.2 API hardening`
+- `v0.3 GitHub workflow cleanup`
+- `PAT integration GA`
+
+## Projects Board
+
+Recommended columns:
+
+- `Backlog`
+- `Ready`
+- `In Progress`
+- `Review`
+- `Done`
+
+Suggested automation rules:
+
+- new Issues go to `Backlog`
+- assigned and scoped Issues move to `Ready`
+- linked PR opened moves Issue to `In Progress`
+- PR in review moves Issue to `Review`
+- merged PR closes Issue and moves it to `Done`
+
+## Branch Protection
+
+Configure branch protection for `main` with:
+
+- require pull request before merging
+- require at least one approval
+- require conversation resolution
+- require status checks to pass
+- restrict direct pushes
+
+Current CI baseline:
+
+- `taskflow-ci`
+- `taskflow-ci / audit`
+- `taskflow-ci / lint`
+- `taskflow-ci / test`
+- `taskflow-ci / build`
+- `taskflow-ci / e2e-smoke`
+
+`audit`, `lint`, `test`, `build`, and `e2e-smoke` should all be configured as required checks for `main`.
+See [`LINT_DEBT.md`](./LINT_DEBT.md) for the current lint maintenance rules.
+
+## Dependency Maintenance
+
+Dependency upkeep is automated with:
+
+- weekly Dependabot PRs for `taskflow/package.json` and GitHub Actions
+- a weekly scheduled run of `taskflow-ci`
+- a weekly `taskflow-maintenance` workflow that uploads a dependency health report artifact
+- a manual `workflow_dispatch` trigger for ad hoc CI verification
+
+E2E policy:
+
+- `e2e-smoke` is the required, secrets-free Playwright gate
+- it validates the login page and protected-route redirect using dummy Firebase config
+- it also validates a mock-authenticated settings route using `NEXT_PUBLIC_E2E_MOCK_AUTH=true`
+- broader Firebase-backed Playwright coverage stays opt-in for local verification until a stable isolated test backend exists
+- see [`E2E_STRATEGY.md`](./E2E_STRATEGY.md) for the current split between required smoke and Firebase-backed local coverage
+
+## Project Flow
+
+Current Project v2 workflow:
+
+- `Backlog`: issue is defined but not ready to start
+- `Ready`: scope is clear and work can be picked up
+- `In Progress`: code or docs changes are actively being made
+- `Review`: a PR is open and waiting on review or merge
+- `Done`: merged or otherwise fully completed
+
+Manual rules:
+
+- move new scoped issues into `Ready` only when acceptance criteria are clear
+- move an issue to `In Progress` when implementation starts, not when it is merely discussed
+- move an issue to `Review` when the linked PR is open
+- move an issue to `Done` only after the change is merged or intentionally completed without code
+
+Automation candidates to revisit later:
+
+- set `In Progress` when a linked PR opens
+- set `Review` when a PR is marked ready for review
+- set `Done` on merge or close with resolution
+
+Recommended dependency PR policy:
+
+- prefer patch and minor updates first
+- keep large framework upgrades isolated
+- do not batch unrelated risky upgrades into the same PR
+- validate `eslint` major upgrades against `eslint-config-next` before merge; `eslint@10` is currently deferred because lint fails inside the bundled React rule stack
+
+Current deferred dependency:
+
+- `eslint@10.x` while `eslint-config-next` still resolves plugin versions that break at runtime under ESLint 10
+
+See [`ESLINT10_TRACKING.md`](./ESLINT10_TRACKING.md) for the exact runtime failure and retry checklist.
+
+## Release Discipline
+
+Before tagging a release:
+
+- ensure related milestone is complete or intentionally deferred
+- confirm test baseline passes
+- summarize API or config changes in the release notes
+
+## Scope Boundaries
+
+GitHub manages:
+
+- code
+- review history
+- Issues
+- PRs
+- documentation
+- release notes
+
+Firebase remains the runtime data store for:
+
+- projects
+- tasks
+- lists
+- members
+- notifications

@@ -180,9 +180,7 @@ export const getMyTasksAcrossProjectsHandler: ToolHandler<
 // get_workload_summary - ワークロードサマリー
 // ============================================
 
-export interface GetWorkloadSummaryArgs {
-  // No arguments needed
-}
+export type GetWorkloadSummaryArgs = Record<string, never>;
 
 export interface ProjectWorkload {
   projectId: string;
@@ -786,7 +784,6 @@ export const generateDailyReportHandler: ToolHandler<
   if (includeNextDayPlan) {
     const tomorrow = new Date(targetDate);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
     const dayAfterTomorrow = new Date(tomorrow);
     dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
 

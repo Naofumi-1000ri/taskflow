@@ -7,7 +7,6 @@ import {
   createChecklist,
   updateChecklist,
   deleteChecklist,
-  getTaskComments,
   createComment,
   deleteComment,
   updateComment,

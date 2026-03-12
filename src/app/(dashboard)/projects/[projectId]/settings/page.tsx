@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useProject } from '@/hooks/useProjects';
@@ -17,7 +18,7 @@ import { cn } from '@/lib/utils';
 import { Loader2, Trash2, UserPlus, X, Upload, Link as LinkIcon, Plus, ExternalLink, Archive, RotateCcw } from 'lucide-react';
 import { getUsersByIds, getAllUsers, subscribeToArchivedTasks, restoreTask, deleteTask } from '@/lib/firebase/firestore';
 import type { Task } from '@/types';
-import { uploadProjectIcon, deleteProjectIcon, uploadProjectIconBlob, uploadProjectHeaderImageBlob, deleteProjectHeaderImage } from '@/lib/firebase/storage';
+import { deleteProjectIcon, uploadProjectIconBlob, uploadProjectHeaderImageBlob, deleteProjectHeaderImage } from '@/lib/firebase/storage';
 import { ImageCropperDialog } from '@/components/common/ImageCropperDialog';
 import { readFileAsDataURL } from '@/lib/utils/image';
 import {
@@ -353,9 +354,11 @@ export default function ProjectSettingsPage() {
               <div className="flex items-center gap-4">
                 {iconUrl ? (
                   <div className="relative">
-                    <img
+                    <Image
                       src={iconUrl}
                       alt="プロジェクトアイコン"
+                      width={64}
+                      height={64}
                       className="h-16 w-16 rounded-lg object-cover"
                     />
                     <button
@@ -480,12 +483,13 @@ export default function ProjectSettingsPage() {
           <CardContent>
             <div className="space-y-4">
               {headerImageUrl ? (
-                <div className="relative">
-                  <img
+                <div className="relative overflow-hidden rounded-lg">
+                  <Image
                     src={headerImageUrl}
                     alt="ヘッダー画像"
-                    className="w-full rounded-lg"
-                    style={{ aspectRatio: '5/1', objectFit: 'cover' }}
+                    width={1600}
+                    height={320}
+                    className="h-auto w-full object-cover"
                   />
                   <button
                     type="button"

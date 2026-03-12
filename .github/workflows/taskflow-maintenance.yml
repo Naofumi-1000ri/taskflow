@@ -1,0 +1,98 @@
+name: taskflow-maintenance
+
+on:
+  schedule:
+    - cron: "0 3 * * 2"
+  workflow_dispatch:
+
+jobs:
+  dependency-health:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate dependency health report
+        run: npm run deps:report
+
+      - name: Upload dependency health report
+        uses: actions/upload-artifact@v4
+        with:
+          name: taskflow-dependency-health
+          path: |
+            dependency-health-report.md
+            dependency-health-summary.json
+
+      - name: Create or update maintenance issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            const summary = JSON.parse(fs.readFileSync('dependency-health-summary.json', 'utf8'));
+            const report = fs.readFileSync('dependency-health-report.md', 'utf8');
+            const title = '[Maintenance] Dependency health';
+            const hasFindings = summary.audit.total > 0 || summary.outdated.total > 0;
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+
+            const existing = issues.find((issue) => issue.title === title);
+
+            if (!hasFindings) {
+              if (existing) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: existing.number,
+                  body: 'Dependency health is clean again. Closing this maintenance issue.',
+                });
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: existing.number,
+                  state: 'closed',
+                });
+              }
+              return;
+            }
+
+            const body = [
+              'Automated weekly dependency health report.',
+              '',
+              `Active outdated packages: ${summary.outdated.total}`,
+              `Deferred outdated packages: ${summary.outdated.deferredTotal}`,
+              '',
+              report,
+            ].join('\n');
+
+            if (existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+            });

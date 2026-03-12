@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -43,46 +43,56 @@ export function CommandPalette() {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   // Quick actions shown when no query
-  const quickActions: QuickAction[] = [
-    {
-      id: 'dashboard',
-      label: 'ダッシュボードを開く',
-      icon: <LayoutDashboard className="h-4 w-4" />,
-      action: () => {
-        router.push('/');
-        closeCommandPalette();
+  const quickActions: QuickAction[] = useMemo(
+    () => [
+      {
+        id: 'dashboard',
+        label: 'ダッシュボードを開く',
+        icon: <LayoutDashboard className="h-4 w-4" />,
+        action: () => {
+          router.push('/');
+          closeCommandPalette();
+        },
       },
-    },
-    {
-      id: 'new-project',
-      label: '新しいプロジェクトを作成',
-      icon: <Plus className="h-4 w-4" />,
-      action: () => {
-        closeCommandPalette();
-        openProjectModal();
+      {
+        id: 'new-project',
+        label: '新しいプロジェクトを作成',
+        icon: <Plus className="h-4 w-4" />,
+        action: () => {
+          closeCommandPalette();
+          openProjectModal();
+        },
       },
-    },
-  ];
+    ],
+    [closeCommandPalette, openProjectModal, router]
+  );
 
   // Build flat list of selectable items
-  const allItems: Array<{ type: 'action' | 'project' | 'task'; data: QuickAction | SearchResult }> =
-    query.trim()
-      ? [
-          ...projectResults.map((r) => ({ type: 'project' as const, data: r })),
-          ...taskResults.map((r) => ({ type: 'task' as const, data: r })),
-        ]
-      : quickActions.map((a) => ({ type: 'action' as const, data: a }));
+  const allItems: Array<{ type: 'action' | 'project' | 'task'; data: QuickAction | SearchResult }> = useMemo(
+    () =>
+      query.trim()
+        ? [
+            ...projectResults.map((r) => ({ type: 'project' as const, data: r })),
+            ...taskResults.map((r) => ({ type: 'task' as const, data: r })),
+          ]
+        : quickActions.map((a) => ({ type: 'action' as const, data: a })),
+    [projectResults, query, quickActions, taskResults]
+  );
 
   // Reset selection when results change
   useEffect(() => {
-    setSelectedIndex(0);
+    queueMicrotask(() => {
+      setSelectedIndex(0);
+    });
   }, [query, projectResults.length, taskResults.length]);
 
   // Clear query when palette closes
   useEffect(() => {
     if (!isCommandPaletteOpen) {
-      setQuery('');
-      setSelectedIndex(0);
+      queueMicrotask(() => {
+        setQuery('');
+        setSelectedIndex(0);
+      });
     }
   }, [isCommandPaletteOpen, setQuery]);
 

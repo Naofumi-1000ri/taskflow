@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import type { User as FirebaseUser } from 'firebase/auth';
 import { useAuthStore } from './authStore';
 import type { User as AppUser } from '@/types';
 
@@ -12,6 +13,8 @@ const mockAppUser: AppUser = {
 };
 
 describe('authStore', () => {
+  const mockFirebaseUser = { uid: 'fb-1' } as FirebaseUser;
+
   beforeEach(() => {
     useAuthStore.getState().reset();
   });
@@ -26,16 +29,14 @@ describe('authStore', () => {
 
   describe('setFirebaseUser', () => {
     it('should set firebase user and mark as authenticated', () => {
-      const mockFbUser = { uid: 'fb-1' } as any;
-      useAuthStore.getState().setFirebaseUser(mockFbUser);
+      useAuthStore.getState().setFirebaseUser(mockFirebaseUser);
       const state = useAuthStore.getState();
-      expect(state.firebaseUser).toBe(mockFbUser);
+      expect(state.firebaseUser).toBe(mockFirebaseUser);
       expect(state.isAuthenticated).toBe(true);
     });
 
     it('should set isAuthenticated to false when user is null', () => {
-      const mockFbUser = { uid: 'fb-1' } as any;
-      useAuthStore.getState().setFirebaseUser(mockFbUser);
+      useAuthStore.getState().setFirebaseUser(mockFirebaseUser);
       useAuthStore.getState().setFirebaseUser(null);
       const state = useAuthStore.getState();
       expect(state.firebaseUser).toBeNull();
@@ -65,8 +66,7 @@ describe('authStore', () => {
 
   describe('reset', () => {
     it('should reset all state to initial values', () => {
-      const mockFbUser = { uid: 'fb-1' } as any;
-      useAuthStore.getState().setFirebaseUser(mockFbUser);
+      useAuthStore.getState().setFirebaseUser(mockFirebaseUser);
       useAuthStore.getState().setUser(mockAppUser);
       useAuthStore.getState().setLoading(false);
 

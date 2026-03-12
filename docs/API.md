@@ -1,0 +1,144 @@
+# API
+
+## Authentication
+
+TaskFlow server routes accept:
+
+- Firebase ID tokens via `Authorization: Bearer <firebase-id-token>`
+- personal access tokens via `Authorization: Bearer tf_...`
+
+Personal access tokens are evaluated as a user identity, then constrained by:
+
+- token permissions
+- token project scope
+- project membership
+- project role
+
+## Token Management
+
+### `GET /api/auth/tokens`
+
+Returns API tokens for the current authenticated user.
+
+### `POST /api/auth/tokens`
+
+Creates a new API token.
+
+Request body:
+
+```json
+{
+  "name": "Claude Desktop",
+  "permissions": ["projects:read", "tasks:read", "tasks:write"],
+  "projectIds": null,
+  "expiresAt": null
+}
+```
+
+### `PATCH /api/auth/tokens/[tokenId]`
+
+Deactivates a token.
+
+### `DELETE /api/auth/tokens/[tokenId]`
+
+Deletes a token.
+
+## Project Routes
+
+### `GET /api/projects`
+
+Returns projects visible to the authenticated user, filtered by token scope if present.
+
+### `GET /api/projects/[projectId]/lists`
+
+Requires project read access.
+
+Returns ordered project lists including:
+
+- `id`
+- `name`
+- `color`
+- `order`
+- `autoCompleteOnEnter`
+- `autoUncompleteOnExit`
+
+### `GET /api/projects/[projectId]/status`
+
+Requires project read access.
+
+Returns:
+
+- project metadata
+- task summary counts
+- per-list counts
+
+### `GET /api/projects/[projectId]/tasks`
+
+Requires `tasks:read`.
+
+Returns non-archived tasks in the project.
+
+### `POST /api/projects/[projectId]/tasks`
+
+Requires `tasks:write` and non-viewer project membership.
+
+Supports:
+
+- title
+- description
+- listId
+- assigneeIds
+- labelIds
+- tagIds
+- dependsOnTaskIds
+- priority
+- startDate
+- dueDate
+- durationDays
+- isDueDateFixed
+
+### `PATCH /api/projects/[projectId]/tasks/[taskId]`
+
+Requires `tasks:write` and non-viewer project membership.
+
+Supports partial update of:
+
+- listId
+- title
+- description
+- assigneeIds
+- labelIds
+- tagIds
+- dependsOnTaskIds
+- priority
+- startDate
+- dueDate
+- durationDays
+- isDueDateFixed
+- isCompleted
+
+### `DELETE /api/projects/[projectId]/tasks/[taskId]`
+
+Archives the task. This is a soft delete.
+
+### `POST /api/projects/[projectId]/tasks/[taskId]/restore`
+
+Restores an archived task.
+
+## Error Model
+
+Current routes use standard HTTP status codes:
+
+- `400` invalid request body or invalid field values
+- `401` missing or invalid auth
+- `403` permission denied
+- `404` missing project or task
+- `409` invalid state transition such as restoring a non-archived task
+
+## Notes
+
+- List and task APIs intentionally expose application-oriented JSON, not raw Firestore documents.
+- API routes currently focus on project and task integration use cases.
+- Lint cleanup is still tracked separately from API feature work.
+
+See [`API_INTEGRATION.md`](./API_INTEGRATION.md) for concrete curl examples and a recommended client flow.

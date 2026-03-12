@@ -2,8 +2,6 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '@/components/ui/skeleton';
-import { WifiOff, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { PersonalMemo } from '@/components/dashboard/PersonalMemo';
 import { MyTasks } from '@/components/dashboard/MyTasks';
 import { OverdueTasksAlert } from '@/components/dashboard/OverdueTasksAlert';

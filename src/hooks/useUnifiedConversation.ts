@@ -65,13 +65,6 @@ export function useUnifiedConversation({
     }
   }, [conversationId]);
 
-  // Load conversation when ID changes
-  useEffect(() => {
-    if (conversationId && userId) {
-      loadConversation(conversationId);
-    }
-  }, [conversationId, userId]);
-
   const loadConversation = useCallback(async (convId: string) => {
     if (!userId) return;
 
@@ -82,6 +75,13 @@ export function useUnifiedConversation({
       // Failed to load - will start fresh
     }
   }, [userId]);
+
+  // Load conversation when ID changes
+  useEffect(() => {
+    if (conversationId && userId) {
+      loadConversation(conversationId);
+    }
+  }, [conversationId, userId, loadConversation]);
 
   const persistMessage = useCallback(async (
     convId: string,

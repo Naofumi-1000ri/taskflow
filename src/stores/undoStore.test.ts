@@ -189,6 +189,7 @@ describe('undoStore', () => {
   });
 
   it('should handle undo failure gracefully', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const action = {
       id: 'test-1',
       description: 'Failing action',
@@ -203,6 +204,8 @@ describe('undoStore', () => {
     const state = useUndoStore.getState();
     expect(state.undoStack).toHaveLength(1);
     expect(state.redoStack).toHaveLength(0);
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
   });
 
   it('should support multiple undo/redo cycles', async () => {

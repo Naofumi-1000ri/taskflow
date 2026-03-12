@@ -400,7 +400,7 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
         setPendingToolCalls(null);
       }
     },
-    [messages, provider, getActiveModel, isConfigured, onMessageUpdate, onComplete, onError, enableTools]
+    [messages, provider, getActiveModel, isConfigured, onMessageUpdate, onComplete, onError, onToolCalls, enableTools]
   );
 
   const clearMessages = useCallback(() => {

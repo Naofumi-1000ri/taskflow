@@ -9,6 +9,7 @@ import {
   isTestMode,
   getUserData,
 } from '@/lib/firebase/auth';
+import { isE2EMockAuthEnabled } from '@/lib/firebase/testMode';
 
 export function useAuth() {
   const {
@@ -59,6 +60,10 @@ export function useAuth() {
   const signOut = useCallback(async () => {
     try {
       setLoading(true);
+      if (isE2EMockAuthEnabled()) {
+        reset();
+        return;
+      }
       await firebaseSignOut();
       reset();
     } catch (error) {
