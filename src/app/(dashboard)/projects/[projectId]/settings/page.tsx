@@ -20,7 +20,7 @@ import { getUsersByIds, getAllUsers, subscribeToArchivedTasks, restoreTask, dele
 import type { Task } from '@/types';
 import { deleteProjectIcon, uploadProjectIconBlob, uploadProjectHeaderImageBlob, deleteProjectHeaderImage } from '@/lib/firebase/storage';
 import { ImageCropperDialog } from '@/components/common/ImageCropperDialog';
-import { readFileAsDataURL } from '@/lib/utils/image';
+import { readFileAsDataURL, readImageUrlAsDataURL } from '@/lib/utils/image';
 import {
   Dialog,
   DialogContent,
@@ -51,6 +51,7 @@ export default function ProjectSettingsPage() {
   const [iconUrl, setIconUrl] = useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingIcon, setIsUploadingIcon] = useState(false);
+  const [isPreparingIconCrop, setIsPreparingIconCrop] = useState(false);
   const [cropperOpen, setCropperOpen] = useState(false);
   const [selectedImageSrc, setSelectedImageSrc] = useState<string>('');
   const [memberUsers, setMemberUsers] = useState<User[]>([]);
@@ -59,6 +60,7 @@ export default function ProjectSettingsPage() {
   // Header image state
   const [headerImageUrl, setHeaderImageUrl] = useState<string | undefined>(undefined);
   const [isUploadingHeader, setIsUploadingHeader] = useState(false);
+  const [isPreparingHeaderCrop, setIsPreparingHeaderCrop] = useState(false);
   const [headerCropperOpen, setHeaderCropperOpen] = useState(false);
   const [selectedHeaderImageSrc, setSelectedHeaderImageSrc] = useState<string>('');
   const headerFileInputRef = useRef<HTMLInputElement>(null);
@@ -196,6 +198,22 @@ export default function ProjectSettingsPage() {
     }
   };
 
+  const handleEditExistingIcon = async () => {
+    if (!iconUrl) return;
+
+    setIsPreparingIconCrop(true);
+    try {
+      const imageSrc = await readImageUrlAsDataURL(iconUrl);
+      setSelectedImageSrc(imageSrc);
+      setCropperOpen(true);
+    } catch (error) {
+      console.error('Failed to prepare icon for recropping:', error);
+      alert('保存済みのアイコン画像を読み込めませんでした。別の画像を選択してお試しください。');
+    } finally {
+      setIsPreparingIconCrop(false);
+    }
+  };
+
   // Header image handlers
   const handleHeaderImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -248,6 +266,22 @@ export default function ProjectSettingsPage() {
       await update({ headerImageUrl: null });
     } catch (error) {
       console.error('Failed to remove header image:', error);
+    }
+  };
+
+  const handleEditExistingHeaderImage = async () => {
+    if (!headerImageUrl) return;
+
+    setIsPreparingHeaderCrop(true);
+    try {
+      const imageSrc = await readImageUrlAsDataURL(headerImageUrl);
+      setSelectedHeaderImageSrc(imageSrc);
+      setHeaderCropperOpen(true);
+    } catch (error) {
+      console.error('Failed to prepare header image for recropping:', error);
+      alert('保存済みのヘッダー画像を読み込めませんでした。別の画像を選択してお試しください。');
+    } finally {
+      setIsPreparingHeaderCrop(false);
     }
   };
 
@@ -382,8 +416,32 @@ export default function ProjectSettingsPage() {
                   </div>
                 )}
                 <div className="text-sm text-muted-foreground">
-                  <p>画像をアップロード</p>
+                  <p>{iconUrl ? '画像を再調整または変更' : '画像をアップロード'}</p>
                   <p className="text-xs">JPG, PNG, GIF, WebP (最大5MB)</p>
+                  {iconUrl && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleEditExistingIcon}
+                        disabled={isPreparingIconCrop || isUploadingIcon}
+                      >
+                        {isPreparingIconCrop && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        位置を再調整
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isPreparingIconCrop || isUploadingIcon}
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        別の画像に変更
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 <input
                   ref={fileInputRef}
@@ -491,13 +549,25 @@ export default function ProjectSettingsPage() {
                     height={320}
                     className="h-auto w-full object-cover"
                   />
-                  <button
-                    type="button"
-                    onClick={handleRemoveHeaderImage}
-                    className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                  <div className="absolute top-2 right-2 flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleEditExistingHeaderImage}
+                      disabled={isPreparingHeaderCrop || isUploadingHeader}
+                    >
+                      {isPreparingHeaderCrop && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      位置を再調整
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={handleRemoveHeaderImage}
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div
@@ -525,6 +595,17 @@ export default function ProjectSettingsPage() {
               <p className="text-xs text-muted-foreground">
                 推奨サイズ: 1500×300px (5:1)、最大10MB
               </p>
+              {headerImageUrl && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => headerFileInputRef.current?.click()}
+                  disabled={isPreparingHeaderCrop || isUploadingHeader}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  別の画像に変更
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
