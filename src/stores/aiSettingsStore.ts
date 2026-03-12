@@ -9,6 +9,9 @@ interface AISettingsState {
   openaiKeyConfigured: boolean;
   anthropicKeyConfigured: boolean;
   geminiKeyConfigured: boolean;
+  // Project access scope. Null means all projects are allowed.
+  allowedProjectIds: string[] | null;
+  projectAccessLoaded: boolean;
   // Models
   openaiModel: string;
   anthropicModel: string;
@@ -16,9 +19,12 @@ interface AISettingsState {
   // Actions
   setProvider: (provider: AIProviderType) => void;
   setKeyConfigured: (provider: AIProviderType, configured: boolean) => void;
+  setAllowedProjectIds: (projectIds: string[] | null) => void;
+  setProjectAccessLoaded: (loaded: boolean) => void;
   setModel: (provider: AIProviderType, model: string) => void;
   getActiveModel: () => string;
   isConfigured: () => boolean;
+  canAccessProject: (projectId: string | null | undefined) => boolean;
 }
 
 export const useAISettingsStore = create<AISettingsState>()(
@@ -28,6 +34,8 @@ export const useAISettingsStore = create<AISettingsState>()(
       openaiKeyConfigured: false,
       anthropicKeyConfigured: false,
       geminiKeyConfigured: false,
+      allowedProjectIds: null,
+      projectAccessLoaded: false,
       openaiModel: DEFAULT_MODELS.openai,
       anthropicModel: DEFAULT_MODELS.anthropic,
       geminiModel: DEFAULT_MODELS.gemini,
@@ -47,6 +55,9 @@ export const useAISettingsStore = create<AISettingsState>()(
             break;
         }
       },
+
+      setAllowedProjectIds: (allowedProjectIds) => set({ allowedProjectIds }),
+      setProjectAccessLoaded: (projectAccessLoaded) => set({ projectAccessLoaded }),
 
       setModel: (provider, model) => {
         switch (provider) {
@@ -84,6 +95,14 @@ export const useAISettingsStore = create<AISettingsState>()(
           case 'gemini':
             return state.geminiKeyConfigured;
         }
+      },
+
+      canAccessProject: (projectId) => {
+        const state = get();
+        if (!projectId) {
+          return true;
+        }
+        return state.allowedProjectIds === null || state.allowedProjectIds.includes(projectId);
       },
     }),
     {

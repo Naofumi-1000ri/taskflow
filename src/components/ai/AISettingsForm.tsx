@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -13,6 +14,8 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAISettings } from '@/hooks/useAISettings';
+import { useProjects } from '@/hooks/useProjects';
+import { filterProjectsForAI, normalizeAllowedProjectIdsForSave } from '@/lib/ai/projectAccess';
 import { AIProviderType } from '@/types/ai';
 import { Eye, EyeOff, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
@@ -21,18 +24,36 @@ export function AISettingsForm() {
     provider,
     isConfigured,
     isSaving,
+    isProjectAccessSaving,
+    projectAccessError,
+    projectAccessLoaded,
     model,
+    allowedProjectIds,
     providers,
     defaultModels,
     setProvider,
     saveApiKey,
+    saveProjectAccess,
     setModel,
   } = useAISettings();
+  const { projects, isLoading: projectsLoading } = useProjects();
 
   const [showApiKey, setShowApiKey] = useState(false);
   const [localApiKey, setLocalApiKey] = useState('');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [projectAccessSaveSuccess, setProjectAccessSaveSuccess] = useState(false);
+  const [projectAccessSaveError, setProjectAccessSaveError] = useState<string | null>(null);
+
+  const visibleAllowedProjectIds = useMemo(
+    () => filterProjectsForAI(projects, allowedProjectIds).map((project) => project.id),
+    [projects, allowedProjectIds]
+  );
+
+  useEffect(() => {
+    setSelectedProjectIds(visibleAllowedProjectIds);
+  }, [visibleAllowedProjectIds]);
 
   const handleProviderChange = (value: string) => {
     setProvider(value as AIProviderType);
@@ -56,6 +77,56 @@ export function AISettingsForm() {
 
   const handleResetModel = () => {
     setModel(defaultModels[provider]);
+  };
+
+  const handleToggleProject = (projectId: string) => {
+    setProjectAccessSaveSuccess(false);
+    setProjectAccessSaveError(null);
+    setSelectedProjectIds((current) =>
+      current.includes(projectId)
+        ? current.filter((id) => id !== projectId)
+        : [...current, projectId]
+    );
+  };
+
+  const handleSelectAllProjects = () => {
+    setProjectAccessSaveSuccess(false);
+    setProjectAccessSaveError(null);
+    setSelectedProjectIds(projects.map((project) => project.id));
+  };
+
+  const handleClearAllProjects = () => {
+    setProjectAccessSaveSuccess(false);
+    setProjectAccessSaveError(null);
+    setSelectedProjectIds([]);
+  };
+
+  const hasProjectAccessChanges = useMemo(() => {
+    if (selectedProjectIds.length !== visibleAllowedProjectIds.length) {
+      return true;
+    }
+
+    const selectedProjectIdSet = new Set(selectedProjectIds);
+    return visibleAllowedProjectIds.some((projectId) => !selectedProjectIdSet.has(projectId));
+  }, [selectedProjectIds, visibleAllowedProjectIds]);
+
+  const handleSaveProjectAccess = async () => {
+    setProjectAccessSaveError(null);
+    setProjectAccessSaveSuccess(false);
+
+    try {
+      const normalizedAllowedProjectIds = normalizeAllowedProjectIdsForSave(
+        selectedProjectIds,
+        projects.map((project) => project.id)
+      );
+      await saveProjectAccess(normalizedAllowedProjectIds);
+      setProjectAccessSaveSuccess(true);
+      setTimeout(() => setProjectAccessSaveSuccess(false), 3000);
+    } catch (error) {
+      setProjectAccessSaveError(
+        error instanceof Error ? error.message : 'AIアクセス設定の保存に失敗しました'
+      );
+    }
   };
 
   return (
@@ -192,6 +263,108 @@ export function AISettingsForm() {
             <p className="text-xs text-muted-foreground">
               デフォルト: {defaultModels[provider]}
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>AIアクセス対象プロジェクト</CardTitle>
+          <CardDescription>
+            AIが閲覧・操作できるプロジェクトを選択します
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleSelectAllProjects}
+              disabled={projectsLoading || projects.length === 0}
+            >
+              すべて選択
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleClearAllProjects}
+              disabled={projectsLoading || projects.length === 0}
+            >
+              すべて解除
+            </Button>
+          </div>
+
+          {!projectAccessLoaded && !projectAccessError ? (
+            <div className="flex items-center gap-2 rounded-md bg-muted p-3 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              AIアクセス設定を読み込み中...
+            </div>
+          ) : projectsLoading ? (
+            <div className="flex items-center gap-2 rounded-md bg-muted p-3 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              プロジェクトを読み込み中...
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
+              プロジェクトがありません。作成後にAIアクセス対象を選択できます。
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {projects.map((project) => (
+                <div key={project.id} className="flex items-start gap-3 rounded-md border p-3">
+                  <Checkbox
+                    id={`ai-project-${project.id}`}
+                    checked={selectedProjectIds.includes(project.id)}
+                    onCheckedChange={() => handleToggleProject(project.id)}
+                  />
+                  <div className="grid gap-0.5 leading-none">
+                    <label
+                      htmlFor={`ai-project-${project.id}`}
+                      className="cursor-pointer text-sm font-medium"
+                    >
+                      {project.name}
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      {project.description || 'このプロジェクトでAIを利用できます'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {(projectAccessError || projectAccessSaveError) && (
+            <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <span className="text-sm text-destructive">
+                {projectAccessSaveError || projectAccessError}
+              </span>
+            </div>
+          )}
+
+          {projectAccessSaveSuccess && (
+            <div className="flex items-center gap-2 rounded-md bg-green-50 p-3">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <span className="text-sm text-green-600">AIアクセス設定を保存しました</span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between rounded-md bg-muted p-3">
+            <p className="text-xs text-muted-foreground">
+              未選択のプロジェクトは相棒AIの対象外になります。
+            </p>
+            <Button
+              type="button"
+              onClick={handleSaveProjectAccess}
+              disabled={projectsLoading || isProjectAccessSaving || !hasProjectAccessChanges}
+            >
+              {isProjectAccessSaving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              保存
+            </Button>
           </div>
         </CardContent>
       </Card>

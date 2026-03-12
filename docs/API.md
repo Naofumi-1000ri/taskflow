@@ -43,6 +43,36 @@ Deactivates a token.
 
 Deletes a token.
 
+## First-Party AI Settings Routes
+
+These routes are intended for the authenticated TaskFlow UI, not external PAT integrations.
+
+### `GET /api/ai/settings`
+
+Returns AI project access settings for the current user.
+
+Response shape:
+
+```json
+{
+  "allowedProjectIds": null
+}
+```
+
+`null` means the user's AI can access all current and future projects.
+
+### `PATCH /api/ai/settings`
+
+Updates AI project access settings for the current user.
+
+Request body:
+
+```json
+{
+  "allowedProjectIds": ["project-a", "project-b"]
+}
+```
+
 ## Project Routes
 
 ### `GET /api/projects`

@@ -97,9 +97,12 @@ Current integration routes:
 - `POST /api/auth/tokens`
 - `PATCH /api/auth/tokens/[tokenId]`
 - `DELETE /api/auth/tokens/[tokenId]`
+- `GET /api/ai/settings`
+- `PATCH /api/ai/settings`
 
 See [`docs/API.md`](./docs/API.md) for the current API surface and auth model.
 See [`docs/API_INTEGRATION.md`](./docs/API_INTEGRATION.md) for curl examples and integration flow.
+See [`docs/AI_ACCESS_CONTROL.md`](./docs/AI_ACCESS_CONTROL.md) for project-level AI access rules.
 See [`docs/GITHUB_WORKFLOW.md`](./docs/GITHUB_WORKFLOW.md) for GitHub workflow rules.
 See [`docs/LINT_DEBT.md`](./docs/LINT_DEBT.md) for current lint status and maintenance rules.
 See [`docs/ESLINT10_TRACKING.md`](./docs/ESLINT10_TRACKING.md) for the deferred ESLint 10 upgrade.
@@ -131,5 +134,6 @@ See [`docs/E2E_STRATEGY.md`](./docs/E2E_STRATEGY.md) for the current test-mode s
 ## Project Notes
 
 - API token management UI is under `src/app/(dashboard)/settings/api-keys/page.tsx`
+- AI project access settings UI is under `src/app/(dashboard)/settings/ai/page.tsx`
 - Firebase rules and indexes are versioned in `firestore.rules`, `firestore.indexes.json`, and `storage.rules`
 - Existing AI routes remain under `src/app/api/ai`

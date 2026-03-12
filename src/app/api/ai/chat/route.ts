@@ -1,7 +1,12 @@
 import { NextRequest } from 'next/server';
 import { getProvider, isValidProvider } from '@/lib/ai/providers';
 import { AIContext, AIMessage, AIProviderType } from '@/types/ai';
-import { verifyAuthToken, getUserAIApiKey } from '@/lib/firebase/admin';
+import {
+  getUserAIApiKey,
+  getUserAIProjectAccessSettings,
+  verifyAuthToken,
+} from '@/lib/firebase/admin';
+import { filterProjectsForAI, isAIProjectAllowed } from '@/lib/ai/projectAccess';
 
 // Enable streaming for Vercel
 export const runtime = 'nodejs';
@@ -66,6 +71,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const { allowedProjectIds } = await getUserAIProjectAccessSettings(userId);
+    if (!isAIProjectAllowed(projectId, allowedProjectIds)) {
+      return new Response(
+        JSON.stringify({ error: 'このプロジェクトではAIアクセスが無効です。AI設定を確認してください。' }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const filteredContext: AIContext = {
+      ...context,
+      projects: context.projects
+        ? filterProjectsForAI(context.projects, allowedProjectIds)
+        : context.projects,
+    };
+
     // Get provider and create streaming response
     const aiProvider = getProvider(provider);
 
@@ -82,7 +102,7 @@ export async function POST(request: NextRequest) {
 
         const generator = aiProvider.sendMessage(
           messages,
-          context,
+          filteredContext,
           apiKey,
           model,
           { enableTools, projectId: projectId ?? undefined }
