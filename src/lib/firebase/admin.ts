@@ -107,3 +107,44 @@ export async function getUserAISettings(userId: string): Promise<Record<string, 
 
   return settingsDoc.data() as Record<string, string>;
 }
+
+export interface UserAIProjectAccessSettings {
+  allowedProjectIds: string[] | null;
+}
+
+/**
+ * Get AI project access settings for a user from Firestore.
+ * Null means AI can access all current and future projects.
+ */
+export async function getUserAIProjectAccessSettings(
+  userId: string
+): Promise<UserAIProjectAccessSettings> {
+  const db = getAdminDb();
+  const settingsDoc = await db.collection('users').doc(userId).collection('settings').doc('aiSettings').get();
+
+  if (!settingsDoc.exists) {
+    return { allowedProjectIds: null };
+  }
+
+  const data = settingsDoc.data();
+  const allowedProjectIds = Array.isArray(data?.allowedProjectIds)
+    ? data.allowedProjectIds.filter((projectId): projectId is string => typeof projectId === 'string' && projectId.length > 0)
+    : null;
+
+  return { allowedProjectIds };
+}
+
+/**
+ * Save AI project access settings for a user to Firestore.
+ * Null means AI can access all current and future projects.
+ */
+export async function saveUserAIProjectAccessSettings(
+  userId: string,
+  allowedProjectIds: string[] | null
+): Promise<void> {
+  const db = getAdminDb();
+  await db.collection('users').doc(userId).collection('settings').doc('aiSettings').set(
+    { allowedProjectIds },
+    { merge: true }
+  );
+}

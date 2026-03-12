@@ -26,6 +26,8 @@ import { useAISettingsStore } from '@/stores/aiSettingsStore';
 import { useUnifiedConversation } from '@/hooks/useUnifiedConversation';
 import { useCompanionState } from '@/hooks/useCompanionState';
 import { useUnifiedConversations } from '@/hooks/useUnifiedConversations';
+import { getAuthHeaders } from '@/lib/firebase/authToken';
+import { filterProjectsForAI, isAIProjectAllowed } from '@/lib/ai/projectAccess';
 import { ChatInput } from './ChatInput';
 import { ChatMessage } from './ChatMessage';
 import { ToolConfirmDialog } from './ToolConfirmDialog';
@@ -52,7 +54,14 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
   const userId = user?.id || firebaseUser?.uid || '';
   const displayName = user?.displayName || firebaseUser?.displayName || '';
   const { projects, isLoading: projectsLoading } = useProjects();
-  const { provider, isConfigured } = useAISettingsStore();
+  const {
+    provider,
+    isConfigured,
+    allowedProjectIds,
+    projectAccessLoaded,
+    setAllowedProjectIds,
+    setProjectAccessLoaded,
+  } = useAISettingsStore();
   const {
     timePeriod,
     currentHour,
@@ -73,19 +82,83 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
   const [showConversations, setShowConversations] = useState(false);
   const [showToolConfirm, setShowToolConfirm] = useState(false);
   const [pendingTools, setPendingTools] = useState<ToolCall[] | null>(null);
+  const [projectAccessError, setProjectAccessError] = useState<string | null>(null);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const projectAccessRequestedRef = useRef(false);
+
+  useEffect(() => {
+    projectAccessRequestedRef.current = false;
+    setProjectAccessError(null);
+    setProjectAccessLoaded(false);
+  }, [firebaseUser?.uid, setProjectAccessLoaded]);
+
+  useEffect(() => {
+    if (!firebaseUser || projectAccessLoaded || projectAccessRequestedRef.current) {
+      return;
+    }
+
+    projectAccessRequestedRef.current = true;
+
+    void (async () => {
+      try {
+        setProjectAccessError(null);
+        const headers = await getAuthHeaders();
+        const response = await fetch('/api/ai/settings', { headers });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => null);
+          throw new Error(data?.error || 'AIアクセス設定の取得に失敗しました');
+        }
+
+        const data = await response.json();
+        setAllowedProjectIds(
+          Array.isArray(data.allowedProjectIds) ? data.allowedProjectIds : null
+        );
+        setProjectAccessLoaded(true);
+      } catch (error) {
+        setProjectAccessError(
+          error instanceof Error ? error.message : 'AIアクセス設定の取得に失敗しました'
+        );
+      }
+    })();
+  }, [
+    firebaseUser,
+    projectAccessLoaded,
+    setAllowedProjectIds,
+    setProjectAccessLoaded,
+  ]);
 
   // Find current project details
   const currentProject = useMemo(
     () => projects.find((p) => p.id === projectId),
     [projects, projectId]
   );
+  const accessibleProjects = useMemo(
+    () => filterProjectsForAI(projects, allowedProjectIds),
+    [projects, allowedProjectIds]
+  );
+  const isCurrentProjectAllowed = useMemo(
+    () => isAIProjectAllowed(projectId, allowedProjectIds),
+    [projectId, allowedProjectIds]
+  );
+  const projectIds = useMemo(
+    () => accessibleProjects.map((project) => project.id),
+    [accessibleProjects]
+  );
+  const isProjectAccessBlocked = Boolean(
+    projectAccessLoaded &&
+      (
+        (!projectId && projectIds.length === 0) ||
+        (projectId && !isCurrentProjectAllowed)
+      )
+  );
+  const effectiveUserId = projectAccessLoaded && !isProjectAccessBlocked ? userId : '';
 
   // Build context dynamically based on projectId
   const companionContext: AIContext = useMemo(() => {
-    if (projectId && currentProject) {
+    if (projectId && currentProject && isCurrentProjectAllowed) {
       return {
         scope: 'companion' as const,
         project: {
@@ -95,7 +168,7 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
           lists: [],
           members: [],
         },
-        projects: projects.map((p) => ({
+        projects: accessibleProjects.map((p) => ({
           id: p.id,
           name: p.name,
           description: p.description || '',
@@ -111,7 +184,7 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
     }
     return {
       scope: 'companion' as const,
-      projects: projects.map((p) => ({
+      projects: accessibleProjects.map((p) => ({
         id: p.id,
         name: p.name,
         description: p.description || '',
@@ -124,7 +197,15 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
       },
       currentHour,
     };
-  }, [userId, displayName, projects, currentProject, projectId, currentHour]);
+  }, [
+    accessibleProjects,
+    currentHour,
+    currentProject,
+    displayName,
+    isCurrentProjectAllowed,
+    projectId,
+    userId,
+  ]);
 
   // Dynamic quick actions based on context
   const quickActions: QuickAction[] = useMemo(() => {
@@ -190,16 +271,13 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
     return [reportAction, priorityAction, workloadAction, planAction];
   }, [projectId, timePeriod]);
 
-  // Project IDs for cross-project tools
-  const projectIds = useMemo(() => projects.map((p) => p.id), [projects]);
-
   // Conversations list (filtered by projectId context)
   const {
     conversations,
     isLoading: conversationsLoading,
     deleteConversationById,
   } = useUnifiedConversations({
-    userId: userId || null,
+    userId: effectiveUserId || null,
     projectId: projectId ?? null,
   });
 
@@ -213,8 +291,8 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
     cancelToolExecution,
     clearMessages,
   } = useUnifiedConversation({
-    userId,
-    projectId,
+    userId: effectiveUserId,
+    projectId: isProjectAccessBlocked ? null : projectId,
     projectIds,
     context: companionContext,
     conversationId: selectedConversationId,
@@ -277,9 +355,9 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
 
   // Handle sending a message
   const handleSendMessage = useCallback(async (content: string) => {
-    if (!userId) return;
+    if (!effectiveUserId || isProjectAccessBlocked || !projectAccessLoaded) return;
     await sendMessage(content);
-  }, [userId, sendMessage]);
+  }, [effectiveUserId, isProjectAccessBlocked, projectAccessLoaded, sendMessage]);
 
   // Handle quick action
   const handleQuickAction = useCallback((action: QuickAction) => {
@@ -341,7 +419,31 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
   }, [projectId, currentProject, timePeriod]);
 
   // Disable check - need either projects (dashboard) or projectId (project page)
-  const isDisabled = !projectId && projectIds.length === 0;
+  const isProjectAccessLoading = !projectAccessLoaded && !projectAccessError;
+  const isDisabled =
+    isProjectAccessLoading ||
+    isProjectAccessBlocked ||
+    (!projectId && projectIds.length === 0);
+  const accessStateCopy = useMemo(() => {
+    if (projectAccessError) {
+      return {
+        title: 'AIアクセス設定を読み込めませんでした',
+        description: projectAccessError,
+      };
+    }
+
+    if (projectId && !isCurrentProjectAllowed) {
+      return {
+        title: 'このプロジェクトではAIアクセスが無効です',
+        description: 'AI設定でこのプロジェクトを有効にすると、相棒AIが再び利用できます。',
+      };
+    }
+
+    return {
+      title: 'AIアクセス対象のプロジェクトがありません',
+      description: 'AI設定で少なくとも1つのプロジェクトを有効にしてください。',
+    };
+  }, [isCurrentProjectAllowed, projectAccessError, projectId]);
 
   // Auto-greeting on panel open (dashboard only)
   const autoGreetSentRef = useRef(false);
@@ -352,7 +454,9 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
       messages.length === 0 &&
       !selectedConversationId &&
       isApiConfigured &&
+      projectAccessLoaded &&
       projectIds.length > 0 &&
+      !isProjectAccessBlocked &&
       !autoGreetSentRef.current
     ) {
       if (shouldShowMorningGreeting) {
@@ -374,7 +478,21 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
     if (!isOpen || selectedConversationId) {
       autoGreetSentRef.current = false;
     }
-  }, [isOpen, projectId, messages.length, selectedConversationId, isApiConfigured, projectIds.length, shouldShowMorningGreeting, shouldShowEveningReport, markMorningGreeted, markEveningReported, sendMessage]);
+  }, [
+    isApiConfigured,
+    isOpen,
+    isProjectAccessBlocked,
+    markEveningReported,
+    markMorningGreeted,
+    messages.length,
+    projectAccessLoaded,
+    projectId,
+    projectIds.length,
+    selectedConversationId,
+    sendMessage,
+    shouldShowEveningReport,
+    shouldShowMorningGreeting,
+  ]);
 
   if (!firebaseUser) return null;
 
@@ -454,6 +572,30 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
                 <h3 className="font-medium">APIキーが設定されていません</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   AI機能を使用するには、設定画面でAPIキーを設定してください。
+                </p>
+              </div>
+              <Button onClick={handleGoToSettings}>
+                <Settings className="mr-2 h-4 w-4" />
+                設定画面へ
+              </Button>
+            </div>
+          ) : isProjectAccessLoading ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
+              <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
+              <div className="text-center">
+                <h3 className="font-medium">AIアクセス設定を読み込み中です</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  プロジェクトごとのAI利用設定を確認しています。
+                </p>
+              </div>
+            </div>
+          ) : projectAccessError || isProjectAccessBlocked ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
+              <AlertCircle className="h-12 w-12 text-muted-foreground" />
+              <div className="text-center">
+                <h3 className="font-medium">{accessStateCopy.title}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {accessStateCopy.description}
                 </p>
               </div>
               <Button onClick={handleGoToSettings}>

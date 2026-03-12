@@ -8,6 +8,8 @@ describe('aiSettingsStore', () => {
       openaiKeyConfigured: false,
       anthropicKeyConfigured: false,
       geminiKeyConfigured: false,
+      allowedProjectIds: null,
+      projectAccessLoaded: false,
       openaiModel: 'gpt-4o',
       anthropicModel: 'claude-sonnet-4-20250514',
       geminiModel: 'gemini-3-flash-preview',
@@ -58,6 +60,26 @@ describe('aiSettingsStore', () => {
     it('should change gemini model', () => {
       useAISettingsStore.getState().setModel('gemini', 'gemini-pro');
       expect(useAISettingsStore.getState().geminiModel).toBe('gemini-pro');
+    });
+  });
+
+  describe('project access', () => {
+    it('should store restricted project ids', () => {
+      useAISettingsStore.getState().setAllowedProjectIds(['project-1']);
+      useAISettingsStore.getState().setProjectAccessLoaded(true);
+
+      expect(useAISettingsStore.getState().allowedProjectIds).toEqual(['project-1']);
+      expect(useAISettingsStore.getState().projectAccessLoaded).toBe(true);
+    });
+
+    it('should allow every project when access is unrestricted', () => {
+      expect(useAISettingsStore.getState().canAccessProject('project-1')).toBe(true);
+    });
+
+    it('should block projects outside the restricted set', () => {
+      useAISettingsStore.getState().setAllowedProjectIds(['project-2']);
+      expect(useAISettingsStore.getState().canAccessProject('project-1')).toBe(false);
+      expect(useAISettingsStore.getState().canAccessProject('project-2')).toBe(true);
     });
   });
 
