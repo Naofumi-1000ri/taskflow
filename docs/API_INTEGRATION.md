@@ -122,6 +122,37 @@ curl -X PATCH http://localhost:3000/api/projects/$PROJECT_ID/tasks/$TASK_ID \
   }'
 ```
 
+### Add a task comment
+
+Use this to sync GitHub progress back to the originating TaskFlow task.
+
+```bash
+curl -X POST http://localhost:3000/api/projects/$PROJECT_ID/tasks/$TASK_ID/comments \
+  -H "Authorization: Bearer $TASKFLOW_PAT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "[AIからのメッセージ]\nGitHub Issue: #26\nGitHub PR: #27\n詳細: comment API を実装中です。",
+    "mentions": []
+  }'
+```
+
+Example response:
+
+```json
+{
+  "comment": {
+    "id": "comment_123",
+    "taskId": "task_123",
+    "content": "[AIからのメッセージ]\nGitHub Issue: #26\nGitHub PR: #27\n詳細: comment API を実装中です。",
+    "authorId": "user_123",
+    "mentions": [],
+    "attachments": [],
+    "createdAt": "2026-03-13T00:00:00.000Z",
+    "updatedAt": "2026-03-13T00:00:00.000Z"
+  }
+}
+```
+
 ### Archive a task
 
 ```bash
@@ -154,7 +185,7 @@ Useful permission combinations:
 - broad admin:
   `["admin"]`
 
-`tasks:write` does not bypass project membership. A viewer-level member still cannot mutate tasks.
+`tasks:write` does not bypass project membership. A viewer-level member still cannot mutate tasks or add API comments.
 
 ## Common Errors
 
