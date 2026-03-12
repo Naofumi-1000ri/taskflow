@@ -17,15 +17,28 @@ export function createImage(url: string): Promise<HTMLImageElement> {
 }
 
 /**
- * Convert a File to a data URL
+ * Convert a Blob or File to a data URL
  */
-export function readFileAsDataURL(file: File): Promise<string> {
+export function readFileAsDataURL(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.addEventListener('load', () => resolve(reader.result as string));
     reader.addEventListener('error', reject);
     reader.readAsDataURL(file);
   });
+}
+
+/**
+ * Fetch an image URL and convert it to a data URL so it can be safely re-cropped.
+ */
+export async function readImageUrlAsDataURL(url: string): Promise<string> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image: ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  return readFileAsDataURL(blob);
 }
 
 /**
