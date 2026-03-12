@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthToken } from '@/lib/firebase/admin';
 import { createApiToken, listApiTokens } from '@/lib/auth/apiTokens';
+import { getApiTokenRouteError } from '@/lib/auth/apiTokenErrors';
 import type { ApiKey, ApiKeyCreateData, ApiKeyPermission } from '@/types/apiKey';
 
 function isApiKeyPermission(value: string): value is ApiKeyPermission {
@@ -27,8 +28,7 @@ export async function GET(request: NextRequest) {
     const apiKeys = await listApiTokens(user.uid);
     return NextResponse.json({ apiKeys: apiKeys.map(sanitizeApiKey) });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Internal server error';
-    const status = message.includes('Authorization') ? 401 : 500;
+    const { message, status } = getApiTokenRouteError(error);
     return NextResponse.json({ error: message }, { status });
   }
 }
@@ -73,8 +73,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ apiKey: sanitizeApiKey(apiKey), plainTextKey }, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Internal server error';
-    const status = message.includes('Authorization') ? 401 : 500;
+    const { message, status } = getApiTokenRouteError(error);
     return NextResponse.json({ error: message }, { status });
   }
 }
