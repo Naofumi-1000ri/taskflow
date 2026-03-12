@@ -41,6 +41,12 @@ Every pull request should include:
 
 Keep unrelated refactors out of the same pull request.
 
+Current single-operator rule:
+
+- PRs are still required before merge
+- CI is the main gate
+- approval is not required unless the repository moves back to multi-maintainer review
+
 ## Checks
 
 Current CI runs audit, lint, tests, build, and Playwright auth smoke.
@@ -55,6 +61,11 @@ npm run test:run
 npm run build
 npm run test:e2e:smoke
 ```
+
+Merge policy on GitHub:
+
+- use squash merge
+- let GitHub delete the branch on merge
 
 ## Configuration
 

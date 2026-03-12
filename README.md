@@ -67,6 +67,13 @@ Current baseline:
 Weekly maintenance automation also runs `taskflow-maintenance`, which uploads a dependency health report and updates a tracking issue when findings exist.
 Known deferred update: `eslint@10.x` is intentionally held back until `eslint-config-next` becomes runtime-compatible.
 
+Current GitHub branch policy is tuned for single-operator maintenance:
+
+- pull requests are required
+- CI checks are required
+- approval is not required
+- squash merge is the default
+
 The build script runs through `scripts/run-next-build.mjs`, which suppresses the known
 `baseline-browser-mapping` false-positive warning while preserving the real build exit code and other output.
 

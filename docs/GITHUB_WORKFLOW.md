@@ -89,10 +89,11 @@ Suggested automation rules:
 Configure branch protection for `main` with:
 
 - require pull request before merging
-- require at least one approval
 - require conversation resolution
 - require status checks to pass
 - restrict direct pushes
+- do not allow force pushes
+- do not allow branch deletion
 
 Current CI baseline:
 
@@ -103,8 +104,22 @@ Current CI baseline:
 - `taskflow-ci / build`
 - `taskflow-ci / e2e-smoke`
 
+Single-operator default:
+
+- no required approval
+- no required code owner review
+- no stale review dismissal
+- no admin enforcement
+
 `audit`, `lint`, `test`, `build`, and `e2e-smoke` should all be configured as required checks for `main`.
 See [`LINT_DEBT.md`](./LINT_DEBT.md) for the current lint maintenance rules.
+
+Repository merge settings should be:
+
+- squash merge enabled
+- merge commits disabled
+- rebase merge disabled
+- delete branch on merge enabled
 
 ## Dependency Maintenance
 
@@ -145,6 +160,12 @@ Automation candidates to revisit later:
 - set `In Progress` when a linked PR opens
 - set `Review` when a PR is marked ready for review
 - set `Done` on merge or close with resolution
+
+If the project adds more maintainers later, re-enable:
+
+- required approval
+- code owner review
+- stale review dismissal
 
 Recommended dependency PR policy:
 
