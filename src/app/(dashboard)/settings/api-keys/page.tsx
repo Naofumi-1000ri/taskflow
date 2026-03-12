@@ -30,6 +30,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Key, Plus, Copy, Trash2, ArrowLeft, CheckCircle2, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
+import {
+  formatApiTokenErrorMessage,
+  readApiTokenError,
+} from '@/lib/auth/apiTokenErrors';
 import type { ApiKey, ApiKeyPermission, ApiKeyCreateData } from '@/types/apiKey';
 import { PERMISSION_GROUPS } from '@/types/apiKey';
 
@@ -37,13 +41,17 @@ export default function ApiKeysPage() {
   const { user, firebaseUser } = useAuth();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
   const [selectedPermissions, setSelectedPermissions] = useState<ApiKeyPermission[]>(['tasks:read']);
   const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [newPlainTextKey, setNewPlainTextKey] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
   const [keyToDelete, setKeyToDelete] = useState<ApiKey | null>(null);
+  const [listActionError, setListActionError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const getAuthHeaders = useCallback(async () => {
     if (!firebaseUser) {
@@ -58,15 +66,21 @@ export default function ApiKeysPage() {
   }, [firebaseUser]);
 
   const loadApiKeys = useCallback(async () => {
-    if (!user?.id || !firebaseUser) return;
+    if (!user?.id || !firebaseUser) {
+      setLoadError('ログイン状態を確認できませんでした。ページを再読み込みして、もう一度お試しください。');
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
+    setLoadError(null);
     try {
       const response = await fetch('/api/auth/tokens', {
         headers: await getAuthHeaders(),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to load API keys');
+        throw new Error(await readApiTokenError(response, 'APIキーの取得に失敗しました。'));
       }
 
       const data = await response.json() as { apiKeys: ApiKey[] };
@@ -78,7 +92,15 @@ export default function ApiKeysPage() {
           expiresAt: key.expiresAt ? new Date(key.expiresAt) : null,
         }))
       );
+      setListActionError(null);
     } catch (error) {
+      setApiKeys([]);
+      setLoadError(
+        formatApiTokenErrorMessage(
+          error instanceof Error ? error.message : null,
+          'APIキーの取得に失敗しました。'
+        )
+      );
       console.error('Failed to load API keys:', error);
     } finally {
       setIsLoading(false);
@@ -92,9 +114,13 @@ export default function ApiKeysPage() {
   }, [firebaseUser, loadApiKeys, user?.id]);
 
   const handleCreateKey = async () => {
-    if (!user?.id || !firebaseUser || !newKeyName.trim()) return;
+    if (!user?.id || !firebaseUser || !newKeyName.trim()) {
+      setCreateError('ログイン状態を確認できませんでした。ページを再読み込みして、もう一度お試しください。');
+      return;
+    }
 
     setIsCreating(true);
+    setCreateError(null);
     try {
       const data: ApiKeyCreateData = {
         name: newKeyName.trim(),
@@ -113,14 +139,21 @@ export default function ApiKeysPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create API key');
+        throw new Error(await readApiTokenError(response, 'APIキーの作成に失敗しました。'));
       }
 
       const result = await response.json() as { plainTextKey: string };
       const { plainTextKey } = result;
       setNewPlainTextKey(plainTextKey);
+      setListActionError(null);
       await loadApiKeys();
     } catch (error) {
+      setCreateError(
+        formatApiTokenErrorMessage(
+          error instanceof Error ? error.message : null,
+          'APIキーの作成に失敗しました。'
+        )
+      );
       console.error('Failed to create API key:', error);
     } finally {
       setIsCreating(false);
@@ -141,41 +174,73 @@ export default function ApiKeysPage() {
     setSelectedPermissions(['tasks:read']);
     setNewPlainTextKey(null);
     setCopiedKey(false);
+    setCreateError(null);
+  };
+
+  const handleCreateDialogOpenChange = (open: boolean) => {
+    if (!open) {
+      handleCloseCreateDialog();
+      return;
+    }
+    setIsCreateDialogOpen(true);
   };
 
   const handleDeactivateKey = async (key: ApiKey) => {
-    if (!user?.id || !firebaseUser) return;
+    if (!user?.id || !firebaseUser) {
+      setListActionError('ログイン状態を確認できませんでした。ページを再読み込みして、もう一度お試しください。');
+      return;
+    }
+
     try {
+      setListActionError(null);
       const response = await fetch(`/api/auth/tokens/${key.id}`, {
         method: 'PATCH',
         headers: await getAuthHeaders(),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to deactivate API key');
+        throw new Error(await readApiTokenError(response, 'APIキーの無効化に失敗しました。'));
       }
 
       await loadApiKeys();
     } catch (error) {
+      setListActionError(
+        formatApiTokenErrorMessage(
+          error instanceof Error ? error.message : null,
+          'APIキーの無効化に失敗しました。'
+        )
+      );
       console.error('Failed to deactivate API key:', error);
     }
   };
 
   const handleDeleteKey = async () => {
-    if (!user?.id || !firebaseUser || !keyToDelete) return;
+    if (!user?.id || !firebaseUser || !keyToDelete) {
+      setDeleteError('ログイン状態を確認できませんでした。ページを再読み込みして、もう一度お試しください。');
+      return;
+    }
+
     try {
+      setDeleteError(null);
+      setListActionError(null);
       const response = await fetch(`/api/auth/tokens/${keyToDelete.id}`, {
         method: 'DELETE',
         headers: await getAuthHeaders(),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete API key');
+        throw new Error(await readApiTokenError(response, 'APIキーの削除に失敗しました。'));
       }
 
       await loadApiKeys();
       setKeyToDelete(null);
     } catch (error) {
+      const message = formatApiTokenErrorMessage(
+        error instanceof Error ? error.message : null,
+        'APIキーの削除に失敗しました。'
+      );
+      setDeleteError(message);
+      setListActionError(message);
       console.error('Failed to delete API key:', error);
     }
   };
@@ -247,7 +312,7 @@ export default function ApiKeysPage() {
                 MCPサーバーやその他の外部ツールで使用するAPIキーです
               </CardDescription>
             </div>
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <Dialog open={isCreateDialogOpen} onOpenChange={handleCreateDialogOpenChange}>
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="mr-2 h-4 w-4" />
@@ -339,6 +404,12 @@ export default function ApiKeysPage() {
                           </div>
                         ))}
                       </div>
+                      {createError ? (
+                        <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-3">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" />
+                          <span className="text-sm text-destructive">{createError}</span>
+                        </div>
+                      ) : null}
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={handleCloseCreateDialog}>
@@ -360,6 +431,19 @@ export default function ApiKeysPage() {
         <CardContent>
           {isLoading ? (
             <div className="py-8 text-center text-muted-foreground">読み込み中...</div>
+          ) : loadError ? (
+            <div className="space-y-4 rounded-lg border border-destructive/30 bg-destructive/10 p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-destructive" />
+                <div className="space-y-1">
+                  <p className="font-medium text-destructive">APIキーを読み込めませんでした</p>
+                  <p className="text-sm text-destructive">{loadError}</p>
+                </div>
+              </div>
+              <Button variant="outline" onClick={() => void loadApiKeys()}>
+                再読み込み
+              </Button>
+            </div>
           ) : apiKeys.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">
               <Key className="mx-auto h-12 w-12 opacity-30" />
@@ -368,6 +452,12 @@ export default function ApiKeysPage() {
             </div>
           ) : (
             <div className="space-y-4">
+              {listActionError ? (
+                <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-3">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" />
+                  <span className="text-sm text-destructive">{listActionError}</span>
+                </div>
+              ) : null}
               {apiKeys.map((key) => (
                 <div
                   key={key.id}
@@ -456,7 +546,15 @@ export default function ApiKeysPage() {
         </CardContent>
       </Card>
 
-      <AlertDialog open={!!keyToDelete} onOpenChange={() => setKeyToDelete(null)}>
+      <AlertDialog
+        open={!!keyToDelete}
+        onOpenChange={(open) => {
+          if (!open) {
+            setKeyToDelete(null);
+            setDeleteError(null);
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>APIキーを削除しますか？</AlertDialogTitle>
@@ -465,6 +563,12 @@ export default function ApiKeysPage() {
               このキーを使用しているすべてのアプリケーションは動作しなくなります。
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteError ? (
+            <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" />
+              <span className="text-sm text-destructive">{deleteError}</span>
+            </div>
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel>キャンセル</AlertDialogCancel>
             <AlertDialogAction
