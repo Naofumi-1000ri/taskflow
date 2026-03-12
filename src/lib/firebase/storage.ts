@@ -5,6 +5,10 @@ import {
   deleteObject,
 } from 'firebase/storage';
 import { getFirebaseStorage } from './config';
+import {
+  createCommentAttachmentUploadDescriptor,
+  createUniqueStorageObjectName,
+} from './storageKeys';
 
 export async function uploadFile(
   projectId: string,
@@ -12,8 +16,7 @@ export async function uploadFile(
   file: File
 ): Promise<{ url: string; name: string; type: string; size: number }> {
   const storage = getFirebaseStorage();
-  const timestamp = Date.now();
-  const fileName = `${timestamp}_${file.name}`;
+  const fileName = createUniqueStorageObjectName(file.name);
   const filePath = `projects/${projectId}/tasks/${taskId}/attachments/${fileName}`;
   const fileRef = ref(storage, filePath);
 
@@ -197,8 +200,8 @@ export async function uploadCommentAttachment(
   }
 
   const storage = getFirebaseStorage();
-  const timestamp = Date.now();
-  const fileName = `${timestamp}_${file.name}`;
+  const { attachmentId, storageFileName } = createCommentAttachmentUploadDescriptor(file.name);
+  const fileName = storageFileName;
   const filePath = `projects/${projectId}/tasks/${taskId}/comment_attachments/${fileName}`;
   const fileRef = ref(storage, filePath);
 
@@ -206,7 +209,7 @@ export async function uploadCommentAttachment(
   const url = await getDownloadURL(fileRef);
 
   return {
-    id: `${timestamp}`,
+    id: attachmentId,
     url,
     name: file.name,
     type: file.type,
