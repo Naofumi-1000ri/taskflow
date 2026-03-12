@@ -5,36 +5,49 @@ Apply these settings to `main` in GitHub repository settings.
 ## Required
 
 - require a pull request before merging
-- require approvals: 1 or more
-- require approval of the most recent reviewable push
 - require conversation resolution before merge
 - require status checks before merge
-- include administrators if you want a strict gate
 - block direct pushes
-
-## Status Checks
-
-Start with:
-
-- `test`
-
-Where `test` is the job name from `.github/workflows/taskflow-ci.yml`.
-
-Do not require lint yet. The repository still has existing lint debt outside the current feature scope.
-
-## Optional
-
-- require branches to be up to date before merging
-- require signed commits if your team needs it
 - disable force pushes
 - disable branch deletion
 
+## Status Checks
+
+Current required checks:
+
+- `taskflow-ci / audit`
+- `taskflow-ci / lint`
+- `taskflow-ci / test`
+- `taskflow-ci / build`
+- `taskflow-ci / e2e-smoke`
+
+Keep `strict` status checks enabled so the branch must be up to date before merge.
+
+## Single-Operator Default
+
+For the current single-operator workflow, keep these review gates off:
+
+- require approvals
+- require code owner review
+- dismiss stale approvals
+- include administrators
+
+This keeps `main` protected by CI without deadlocking merges for a solo maintainer.
+
+## Repository Merge Settings
+
+Recommended repository-level merge settings:
+
+- enable squash merge
+- disable merge commits
+- disable rebase merge
+- delete head branch on merge
+
 ## When To Tighten Rules
 
-Add more required checks after the baseline is stable:
+If the repository moves beyond single-operator maintenance, turn these back on:
 
-- lint
-- build
-- e2e smoke tests
-
-Tighten only after those checks are reliable enough not to create constant false failures.
+- require at least one approval
+- require code owner review
+- dismiss stale approvals
+- consider including administrators
