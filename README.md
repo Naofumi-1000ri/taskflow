@@ -131,5 +131,5 @@ See [`docs/E2E_STRATEGY.md`](./docs/E2E_STRATEGY.md) for the current test-mode s
 ## Project Notes
 
 - API token management UI is under `src/app/(dashboard)/settings/api-keys/page.tsx`
-- Firebase rules are versioned in `firestore.rules` and `storage.rules`
+- Firebase rules and indexes are versioned in `firestore.rules`, `firestore.indexes.json`, and `storage.rules`
 - Existing AI routes remain under `src/app/api/ai`
