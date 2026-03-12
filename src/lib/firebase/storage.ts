@@ -147,9 +147,6 @@ export async function deleteProjectIcon(
   }
 }
 
-// Maximum file size for header images (10MB)
-const MAX_HEADER_IMAGE_SIZE = 10 * 1024 * 1024;
-
 export async function uploadProjectHeaderImageBlob(
   projectId: string,
   blob: Blob

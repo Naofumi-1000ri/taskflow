@@ -277,9 +277,7 @@ export const getTaskDetailsHandler: ToolHandler<GetTaskDetailsArgs, GetTaskDetai
 // get_project_summary - プロジェクト概要を取得
 // ============================================
 
-export interface GetProjectSummaryArgs {
-  // No arguments needed
-}
+export type GetProjectSummaryArgs = Record<string, never>;
 
 export interface ListSummary {
   id: string;
@@ -414,9 +412,7 @@ export const getMyTasksHandler: ToolHandler<GetMyTasksArgs, GetMyTasksResult> = 
 // get_overdue_tasks - 期限切れタスクを取得
 // ============================================
 
-export interface GetOverdueTasksArgs {
-  // No arguments needed
-}
+export type GetOverdueTasksArgs = Record<string, never>;
 
 export interface GetOverdueTasksResult {
   tasks: TaskSummary[];

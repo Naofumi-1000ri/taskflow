@@ -83,9 +83,6 @@ export const suggestScheduleChangesToolDefinition: AITool = {
  * Build dependency graph and find critical path
  */
 function findCriticalPath(tasks: Task[]): Task[] {
-  // Build a map of tasks
-  const taskMap = new Map(tasks.map((t) => [t.id, t]));
-
   // Find all "leaf" tasks (tasks that no other task depends on)
   const dependedOnIds = new Set<string>();
   for (const task of tasks) {
@@ -195,7 +192,7 @@ function generateSuggestions(
   }
 
   // Generate suggestions for bottleneck tasks
-  for (const { task, reason } of bottlenecks) {
+  for (const { task } of bottlenecks) {
     if (targetTaskId && !relevantTasks.some((t) => t.id === task.id)) continue;
 
     const dependents = getAllDependentTasks(task.id, tasks);

@@ -67,13 +67,17 @@ export function useGlobalSearch(): UseGlobalSearchReturn {
     const trimmed = query.trim().toLowerCase();
 
     if (!trimmed) {
-      setResults([]);
-      setIsSearching(false);
+      queueMicrotask(() => {
+        setResults([]);
+        setIsSearching(false);
+      });
       return;
     }
 
     const signal = ++abortRef.current;
-    setIsSearching(true);
+    queueMicrotask(() => {
+      setIsSearching(true);
+    });
 
     // Build project map for quick lookup
     const projectMap = new Map<string, Project>();
@@ -142,7 +146,9 @@ export function useGlobalSearch(): UseGlobalSearchReturn {
     });
 
     // Set project-only results immediately while tasks load
-    setResults(projectResults);
+    queueMicrotask(() => {
+      setResults(projectResults);
+    });
   }, [query, projects, fetchAllTasks]);
 
   // Clear cache when projects change

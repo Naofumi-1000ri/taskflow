@@ -12,7 +12,6 @@ import {
   format,
   isToday,
   isWeekend,
-  isSameMonth,
   eachDayOfInterval,
   eachWeekOfInterval,
   eachMonthOfInterval,

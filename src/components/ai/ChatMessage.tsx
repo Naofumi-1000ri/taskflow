@@ -82,7 +82,7 @@ function MessageContent({ content, isStreaming }: MessageContentProps) {
 
 function formatLine(line: string): React.ReactNode {
   // Bold: **text**
-  let result: React.ReactNode[] = [];
+  const result: React.ReactNode[] = [];
   const boldRegex = /\*\*(.*?)\*\*/g;
   let lastIndex = 0;
   let match;

@@ -63,7 +63,12 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
     hasBadge,
   } = useCompanionState();
 
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    return localStorage.getItem('companionAIPanelOpen') === 'true';
+  });
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [showConversations, setShowConversations] = useState(false);
   const [showToolConfirm, setShowToolConfirm] = useState(false);
@@ -222,9 +227,11 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
 
   // Reset conversation when projectId changes
   useEffect(() => {
-    setSelectedConversationId(null);
-    clearMessages();
-  }, [projectId]);
+    queueMicrotask(() => {
+      setSelectedConversationId(null);
+      clearMessages();
+    });
+  }, [projectId, clearMessages]);
 
   // Close panel on outside click
   useEffect(() => {
@@ -263,14 +270,6 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // Remember open state in localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem('companionAIPanelOpen');
-    if (stored === 'true') {
-      setIsOpen(true);
-    }
-  }, []);
 
   useEffect(() => {
     localStorage.setItem('companionAIPanelOpen', String(isOpen));

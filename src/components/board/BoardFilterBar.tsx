@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Filter, Search, X, Calendar, Tag, Eye, EyeOff } from 'lucide-react';
+import { Search, X, Calendar, Tag, Eye, EyeOff } from 'lucide-react';
 import type { Label } from '@/types';
 
 export interface BoardFilters {

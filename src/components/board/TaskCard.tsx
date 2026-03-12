@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -165,20 +166,26 @@ export function TaskCard({ projectId, task, labels, tags, allTasks, onClick, isD
       {imageAttachments.length > 0 && (
         <div className="relative">
           {imageAttachments.length === 1 ? (
-            <img
-              src={imageAttachments[0].url}
-              alt={imageAttachments[0].name}
-              className="h-32 w-full rounded-t-lg object-cover"
-            />
+            <div className="relative h-32 w-full overflow-hidden rounded-t-lg">
+              <Image
+                src={imageAttachments[0].url}
+                alt={imageAttachments[0].name}
+                fill
+                sizes="(max-width: 768px) 100vw, 384px"
+                className="object-cover"
+              />
+            </div>
           ) : (
             <div className="grid grid-cols-2 gap-0.5">
               {imageAttachments.slice(0, 4).map((attachment, index) => (
-                <div key={attachment.id} className="relative">
-                  <img
+                <div key={attachment.id} className="relative h-16">
+                  <Image
                     src={attachment.url}
                     alt={attachment.name}
+                    fill
+                    sizes="(max-width: 768px) 50vw, 192px"
                     className={cn(
-                      'h-16 w-full object-cover',
+                      'object-cover',
                       index === 0 && 'rounded-tl-lg',
                       index === 1 && 'rounded-tr-lg'
                     )}

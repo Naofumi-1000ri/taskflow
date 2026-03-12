@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useProject } from '@/hooks/useProjects';
@@ -14,9 +15,10 @@ import { Badge } from '@/components/ui/badge';
 import { LIST_COLORS } from '@/types';
 import type { User, ProjectRole, ProjectUrl } from '@/types';
 import { cn } from '@/lib/utils';
-import { Loader2, Trash2, UserPlus, X, Upload, Link as LinkIcon, Plus, ExternalLink } from 'lucide-react';
-import { getUsersByIds, getAllUsers } from '@/lib/firebase/firestore';
-import { uploadProjectIcon, deleteProjectIcon, uploadProjectIconBlob, uploadProjectHeaderImageBlob, deleteProjectHeaderImage } from '@/lib/firebase/storage';
+import { Loader2, Trash2, UserPlus, X, Upload, Link as LinkIcon, Plus, ExternalLink, Archive, RotateCcw } from 'lucide-react';
+import { getUsersByIds, getAllUsers, subscribeToArchivedTasks, restoreTask, deleteTask } from '@/lib/firebase/firestore';
+import type { Task } from '@/types';
+import { deleteProjectIcon, uploadProjectIconBlob, uploadProjectHeaderImageBlob, deleteProjectHeaderImage } from '@/lib/firebase/storage';
 import { ImageCropperDialog } from '@/components/common/ImageCropperDialog';
 import { readFileAsDataURL } from '@/lib/utils/image';
 import {
@@ -73,6 +75,11 @@ export default function ProjectSettingsPage() {
   const [isInviting, setIsInviting] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
 
+  // Archived tasks state
+  const [archivedTasks, setArchivedTasks] = useState<Task[]>([]);
+  const [restoringTaskId, setRestoringTaskId] = useState<string | null>(null);
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+
   // Initialize form when project loads
   useEffect(() => {
     if (project) {
@@ -98,6 +105,13 @@ export default function ProjectSettingsPage() {
   useEffect(() => {
     getAllUsers().then(setAllUsers);
   }, []);
+
+  // Subscribe to archived tasks
+  useEffect(() => {
+    if (!projectId) return;
+    const unsubscribe = subscribeToArchivedTasks(projectId, setArchivedTasks);
+    return unsubscribe;
+  }, [projectId]);
 
   if (isLoading) {
     return (
@@ -289,6 +303,34 @@ export default function ProjectSettingsPage() {
     }
   };
 
+  // Archived task handlers
+  const handleRestoreTask = async (taskId: string) => {
+    setRestoringTaskId(taskId);
+    try {
+      await restoreTask(projectId, taskId);
+    } catch (error) {
+      console.error('Failed to restore task:', error);
+      alert('タスクの復元に失敗しました');
+    } finally {
+      setRestoringTaskId(null);
+    }
+  };
+
+  const handlePermanentDeleteTask = async (taskId: string, taskTitle: string) => {
+    if (!confirm(`「${taskTitle}」を完全に削除しますか？\n\nこの操作は取り消せません。添付ファイルも削除されます。`)) {
+      return;
+    }
+    setDeletingTaskId(taskId);
+    try {
+      await deleteTask(projectId, taskId);
+    } catch (error) {
+      console.error('Failed to delete task:', error);
+      alert('タスクの削除に失敗しました');
+    } finally {
+      setDeletingTaskId(null);
+    }
+  };
+
   // Get users not yet in the project
   const availableUsers = allUsers.filter(
     (user) => !members.some((m) => m.userId === user.id)
@@ -312,9 +354,11 @@ export default function ProjectSettingsPage() {
               <div className="flex items-center gap-4">
                 {iconUrl ? (
                   <div className="relative">
-                    <img
+                    <Image
                       src={iconUrl}
                       alt="プロジェクトアイコン"
+                      width={64}
+                      height={64}
                       className="h-16 w-16 rounded-lg object-cover"
                     />
                     <button
@@ -439,12 +483,13 @@ export default function ProjectSettingsPage() {
           <CardContent>
             <div className="space-y-4">
               {headerImageUrl ? (
-                <div className="relative">
-                  <img
+                <div className="relative overflow-hidden rounded-lg">
+                  <Image
                     src={headerImageUrl}
                     alt="ヘッダー画像"
-                    className="w-full rounded-lg"
-                    style={{ aspectRatio: '3/1', objectFit: 'cover' }}
+                    width={1600}
+                    height={320}
+                    className="h-auto w-full object-cover"
                   />
                   <button
                     type="button"
@@ -458,7 +503,7 @@ export default function ProjectSettingsPage() {
                 <div
                   onClick={() => headerFileInputRef.current?.click()}
                   className="flex w-full cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/50 hover:border-primary hover:bg-muted/50"
-                  style={{ aspectRatio: '3/1' }}
+                  style={{ aspectRatio: '5/1' }}
                 >
                   {isUploadingHeader ? (
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -478,7 +523,7 @@ export default function ProjectSettingsPage() {
                 className="hidden"
               />
               <p className="text-xs text-muted-foreground">
-                推奨サイズ: 1500×500px (3:1)、最大10MB
+                推奨サイズ: 1500×300px (5:1)、最大10MB
               </p>
             </div>
           </CardContent>
@@ -701,6 +746,82 @@ export default function ProjectSettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Archived Tasks */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Archive className="h-5 w-5" />
+              アーカイブ済みタスク
+            </CardTitle>
+            <CardDescription>
+              削除されたタスクはここに保存されます（{archivedTasks.length}件）
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {archivedTasks.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                アーカイブ済みのタスクはありません
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {archivedTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className="flex items-center justify-between rounded-lg border p-3"
+                  >
+                    <div className="overflow-hidden flex-1">
+                      <p className="truncate text-sm font-medium">{task.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        アーカイブ日: {task.archivedAt?.toLocaleDateString('ja-JP', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRestoreTask(task.id)}
+                        disabled={restoringTaskId === task.id}
+                        className="h-8 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                      >
+                        {restoringTaskId === task.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <RotateCcw className="mr-1 h-4 w-4" />
+                            復元
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handlePermanentDeleteTask(task.id, task.title)}
+                        disabled={deletingTaskId === task.id}
+                        className="h-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                      >
+                        {deletingTaskId === task.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Trash2 className="mr-1 h-4 w-4" />
+                            完全削除
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Separator />
 
         {/* Danger Zone */}
@@ -759,7 +880,7 @@ export default function ProjectSettingsPage() {
           imageSrc={selectedHeaderImageSrc}
           onCropComplete={handleHeaderCropComplete}
           shape="rect"
-          aspect={3 / 1}
+          aspect={5 / 1}
           title="ヘッダー画像を調整"
           description="画像をドラッグして位置を調整し、スライダーで拡大縮小できます"
           outputSize={1500}

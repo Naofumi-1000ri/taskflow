@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { Menu, Search, User, Settings, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +15,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
 import { NotificationDropdown } from './NotificationDropdown';
-import { cn } from '@/lib/utils';
 
 export function Header() {
   const { user, signOut } = useAuth();

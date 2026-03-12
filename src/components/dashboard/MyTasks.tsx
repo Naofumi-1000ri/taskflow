@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -48,9 +49,11 @@ export function MyTasks() {
                     <div className="flex items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50">
                       {/* Project Icon */}
                       {task.projectIconUrl ? (
-                        <img
+                        <Image
                           src={task.projectIconUrl}
                           alt={task.projectName}
+                          width={24}
+                          height={24}
                           className="h-6 w-6 shrink-0 rounded object-cover"
                         />
                       ) : (

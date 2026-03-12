@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -39,13 +40,11 @@ import {
   X,
   ChevronUp,
   ChevronDown,
-  Star,
   Flag,
   Plus,
   Check,
   Paperclip,
   FileIcon,
-  Image as ImageIcon,
   CheckCircle2,
   Circle,
   Pencil,
@@ -56,7 +55,6 @@ import {
   Copy,
   Clock,
 } from 'lucide-react';
-import { formatFileSize, getFileIcon } from '@/lib/firebase/storage';
 import { cn, linkifyText } from '@/lib/utils';
 import {
   calculateEffectiveStartDate,
@@ -1129,7 +1127,13 @@ export function TaskDetailModal({
                         <div key={comment.id} className="group flex gap-3">
                           <div className="h-8 w-8 flex-shrink-0 rounded-full bg-muted flex items-center justify-center text-xs font-medium overflow-hidden">
                             {author?.photoURL ? (
-                              <img src={author.photoURL} alt={authorName} className="h-full w-full object-cover" />
+                              <Image
+                                src={author.photoURL}
+                                alt={authorName}
+                                width={32}
+                                height={32}
+                                className="h-full w-full object-cover"
+                              />
                             ) : (
                               authorInitials
                             )}
@@ -1248,6 +1252,8 @@ export function TaskDetailModal({
                             if (!file.type.startsWith('image/')) return null;
                             return (
                               <div key={index} className="relative group">
+                                {/* Blob preview is intentionally rendered with img. */}
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                   src={URL.createObjectURL(file)}
                                   alt={file.name}

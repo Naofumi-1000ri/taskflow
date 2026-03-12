@@ -14,7 +14,7 @@ export function UndoToast() {
       // Small delay for enter animation
       requestAnimationFrame(() => setIsVisible(true));
     } else {
-      setIsVisible(false);
+      requestAnimationFrame(() => setIsVisible(false));
     }
   }, [toast]);
 

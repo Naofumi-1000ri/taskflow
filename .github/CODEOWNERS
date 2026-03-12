@@ -1,0 +1,13 @@
+# Default owners
+* @Naofumi-1000ri
+
+# Application code
+/src/ @Naofumi-1000ri
+/src/app/api/ @Naofumi-1000ri
+/src/lib/auth/ @Naofumi-1000ri
+/src/lib/firebase/ @Naofumi-1000ri
+
+# Docs and workflow
+/docs/ @Naofumi-1000ri
+/.github/ @Naofumi-1000ri
+/.github/workflows/ @Naofumi-1000ri

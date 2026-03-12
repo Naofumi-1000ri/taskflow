@@ -6,7 +6,6 @@ import {
   CreateTaskResult,
   CreateTasksArgs,
   CreateTasksResult,
-  ToolExecutionContext,
 } from './types';
 import { validateTask, checkDeadlineOverdue } from './validation';
 import { calculateEffectiveStartDate } from '@/lib/utils/task';
@@ -212,6 +211,9 @@ export const createTaskHandler: ToolHandler<CreateTaskArgs, CreateTaskResult> = 
     isCompleted: false,
     completedAt: null,
     isAbandoned: false,
+    isArchived: false,
+    archivedAt: null,
+    archivedBy: null,
     createdBy: userId,
   });
 
@@ -238,7 +240,7 @@ export const createTasksHandler: ToolHandler<CreateTasksArgs, CreateTasksResult>
     try {
       const result = await createTaskHandler(taskArgs, context);
       results.push(result);
-    } catch (error) {
+    } catch {
       results.push({
         taskId: '',
         title: taskArgs.title,

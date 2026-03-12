@@ -37,13 +37,17 @@ export function useUnifiedConversations({
   // Subscribe to conversations (filtered by projectId if provided)
   useEffect(() => {
     if (!userId) {
-      setConversations([]);
-      setIsLoading(false);
+      queueMicrotask(() => {
+        setConversations([]);
+        setIsLoading(false);
+      });
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
+    queueMicrotask(() => {
+      setIsLoading(true);
+      setError(null);
+    });
 
     const unsubscribe = subscribeToUnifiedConversations(
       userId,

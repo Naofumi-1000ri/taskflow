@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { Bot, ChevronRight } from 'lucide-react';
+import { Bot, ChevronRight, Key } from 'lucide-react';
 
 export default function SettingsPage() {
   return (
@@ -31,6 +31,27 @@ export default function SettingsPage() {
           <Link href="/settings/ai">
             <Button variant="outline" className="w-full justify-between">
               AI設定を開く
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
+
+      {/* API Keys */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Key className="h-5 w-5" />
+            APIキー管理
+          </CardTitle>
+          <CardDescription>
+            外部のAIやツール（MCP）からTaskFlowにアクセスするためのAPIキーを管理します
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link href="/settings/api-keys">
+            <Button variant="outline" className="w-full justify-between">
+              APIキー管理を開く
               <ChevronRight className="h-4 w-4" />
             </Button>
           </Link>

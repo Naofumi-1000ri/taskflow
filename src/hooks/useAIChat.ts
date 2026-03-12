@@ -94,17 +94,25 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
 
         const decoder = new TextDecoder();
         let fullContent = '';
+        let buffer = ''; // Buffer for incomplete lines across chunks
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n').filter((line) => line.trim() !== '');
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+
+          // Split by newlines but keep the last incomplete line in buffer
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep the last (potentially incomplete) line
 
           for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
+            const trimmedLine = line.trim();
+            if (!trimmedLine) continue;
+
+            if (trimmedLine.startsWith('data: ')) {
+              const data = trimmedLine.slice(6);
               if (data === '[DONE]') continue;
 
               try {
@@ -150,9 +158,47 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
                   onMessageUpdate?.(fullContent);
                 }
               } catch (e) {
-                if (e instanceof Error && e.message !== 'Unexpected end of JSON input') {
+                // Ignore JSON parse errors for incomplete data (can happen at chunk boundaries)
+                const errorMsg = e instanceof Error ? e.message : '';
+                const isIncompleteJson = errorMsg.includes('Unexpected end') ||
+                                          errorMsg.includes('Unterminated string') ||
+                                          errorMsg.includes('Unexpected token');
+                if (!isIncompleteJson) {
                   throw e;
                 }
+              }
+            }
+          }
+        }
+
+        // Process any remaining data in buffer
+        if (buffer.trim()) {
+          const trimmedLine = buffer.trim();
+          if (trimmedLine.startsWith('data: ')) {
+            const data = trimmedLine.slice(6);
+            if (data !== '[DONE]') {
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.type === 'text' && parsed.content) {
+                  fullContent += parsed.content;
+                  setMessages((prev) => {
+                    const updated = [...prev];
+                    const lastIndex = updated.length - 1;
+                    if (updated[lastIndex]?.role === 'assistant') {
+                      updated[lastIndex] = {
+                        ...updated[lastIndex],
+                        content: fullContent,
+                      };
+                    }
+                    return updated;
+                  });
+                  onMessageUpdate?.(fullContent);
+                } else if (parsed.type === 'tool_calls' && parsed.toolCalls) {
+                  setPendingToolCalls(parsed.toolCalls);
+                  await onToolCalls?.(parsed.toolCalls);
+                }
+              } catch {
+                // Ignore final incomplete JSON
               }
             }
           }
@@ -248,17 +294,25 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
 
         const decoder = new TextDecoder();
         let fullContent = '';
+        let buffer = ''; // Buffer for incomplete lines across chunks
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n').filter((line) => line.trim() !== '');
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+
+          // Split by newlines but keep the last incomplete line in buffer
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep the last (potentially incomplete) line
 
           for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
+            const trimmedLine = line.trim();
+            if (!trimmedLine) continue;
+
+            if (trimmedLine.startsWith('data: ')) {
+              const data = trimmedLine.slice(6);
               if (data === '[DONE]') continue;
 
               try {
@@ -288,9 +342,47 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
                   await onToolCalls?.(parsed.toolCalls);
                 }
               } catch (e) {
-                if (e instanceof Error && e.message !== 'Unexpected end of JSON input') {
+                // Ignore JSON parse errors for incomplete data (can happen at chunk boundaries)
+                const errorMsg = e instanceof Error ? e.message : '';
+                const isIncompleteJson = errorMsg.includes('Unexpected end') ||
+                                          errorMsg.includes('Unterminated string') ||
+                                          errorMsg.includes('Unexpected token');
+                if (!isIncompleteJson) {
                   throw e;
                 }
+              }
+            }
+          }
+        }
+
+        // Process any remaining data in buffer
+        if (buffer.trim()) {
+          const trimmedLine = buffer.trim();
+          if (trimmedLine.startsWith('data: ')) {
+            const data = trimmedLine.slice(6);
+            if (data !== '[DONE]') {
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.type === 'text' && parsed.content) {
+                  fullContent += parsed.content;
+                  setMessages((prev) => {
+                    const updated = [...prev];
+                    const lastIdx = updated.length - 1;
+                    if (updated[lastIdx]?.role === 'assistant') {
+                      updated[lastIdx] = {
+                        ...updated[lastIdx],
+                        content: fullContent,
+                      };
+                    }
+                    return updated;
+                  });
+                  onMessageUpdate?.(fullContent);
+                } else if (parsed.type === 'tool_calls' && parsed.toolCalls) {
+                  setPendingToolCalls(parsed.toolCalls);
+                  await onToolCalls?.(parsed.toolCalls);
+                }
+              } catch {
+                // Ignore final incomplete JSON
               }
             }
           }
@@ -308,7 +400,7 @@ export function useAIChat(options: UseAIChatOptions = {}): UseAIChatReturn {
         setPendingToolCalls(null);
       }
     },
-    [messages, provider, getActiveModel, isConfigured, onMessageUpdate, onComplete, onError, enableTools]
+    [messages, provider, getActiveModel, isConfigured, onMessageUpdate, onComplete, onError, onToolCalls, enableTools]
   );
 
   const clearMessages = useCallback(() => {

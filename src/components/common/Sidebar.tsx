@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -93,11 +94,13 @@ function SortableProjectItem({
           'flex flex-1 items-center gap-2',
           isCollapsed ? 'justify-center' : 'px-1 py-1'
         )}
-      >
+        >
         {project.iconUrl ? (
-          <img
+          <Image
             src={project.iconUrl}
             alt={project.name}
+            width={20}
+            height={20}
             className="h-5 w-5 shrink-0 rounded object-cover"
           />
         ) : (

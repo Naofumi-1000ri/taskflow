@@ -5,14 +5,12 @@ import {
   createList,
   updateList,
   deleteList,
-  getProjectLists,
   subscribeToProjectLists,
   createTask,
   updateTask,
   deleteTask,
   getProjectTasks,
   subscribeToProjectTasks,
-  getProjectLabels,
   subscribeToProjectLabels,
   subscribeToProjectTags,
   getTaskChecklists,
@@ -221,6 +219,9 @@ export function useBoard(projectId: string | null) {
         isCompleted: shouldAutoComplete,
         completedAt: shouldAutoComplete ? new Date() : null,
         isAbandoned: false,
+        isArchived: false,
+        archivedAt: null,
+        archivedBy: null,
         createdBy,
       });
       logActivity({
@@ -237,7 +238,7 @@ export function useBoard(projectId: string | null) {
 
   // Cascade date updates to dependent tasks
   const cascadeDependentDates = useCallback(
-    async (changedTaskId: string, allTasks: Task[]) => {
+    async function cascadeDependentDatesImpl(changedTaskId: string, allTasks: Task[]) {
       if (!projectId) return;
 
       // Find tasks that depend on the changed task
@@ -268,7 +269,7 @@ export function useBoard(projectId: string | null) {
           const updatedAllTasks = allTasks.map((t) =>
             t.id === depTask.id ? updatedDepTask : t
           );
-          await cascadeDependentDates(depTask.id, updatedAllTasks);
+          await cascadeDependentDatesImpl(depTask.id, updatedAllTasks);
         }
       }
     },
@@ -362,6 +363,9 @@ export function useBoard(projectId: string | null) {
               isCompleted: task.isCompleted,
               completedAt: task.completedAt,
               isAbandoned: task.isAbandoned,
+              isArchived: false,
+              archivedAt: null,
+              archivedBy: null,
               createdBy: task.createdBy,
             });
           },
@@ -509,6 +513,9 @@ export function useBoard(projectId: string | null) {
         isCompleted: false, // New task starts as incomplete
         completedAt: null,
         isAbandoned: false,
+        isArchived: false,
+        archivedAt: null,
+        archivedBy: null,
         createdBy,
       });
 

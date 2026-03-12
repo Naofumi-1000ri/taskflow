@@ -124,8 +124,7 @@ function analyzeTitleQuality(title: string): Suggestion | null {
  * Analyze description for quality issues
  */
 function analyzeDescriptionQuality(
-  description: string,
-  title: string
+  description: string
 ): Suggestion | null {
   const issues: string[] = [];
   let confidence: ConfidenceLevel = 'low';
@@ -378,10 +377,7 @@ export const suggestImprovementsHandler: ToolHandler<
     }
 
     // Analyze description
-    const descSuggestion = analyzeDescriptionQuality(
-      task.description,
-      task.title
-    );
+    const descSuggestion = analyzeDescriptionQuality(task.description);
     if (descSuggestion) {
       suggestions.push(descSuggestion);
     }

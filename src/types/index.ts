@@ -75,6 +75,9 @@ export interface Task {
   isCompleted: boolean;
   completedAt: Date | null; // When the task was completed
   isAbandoned: boolean; // Task was abandoned/cancelled
+  isArchived: boolean; // Soft delete - archived tasks are hidden but not deleted
+  archivedAt: Date | null; // When the task was archived
+  archivedBy: string | null; // Who archived the task
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;

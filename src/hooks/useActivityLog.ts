@@ -32,12 +32,16 @@ export function useActivityLog(projectId: string | null): UseActivityLogReturn {
 
   useEffect(() => {
     if (!projectId) {
-      setLogs([]);
-      setIsLoading(false);
+      queueMicrotask(() => {
+        setLogs([]);
+        setIsLoading(false);
+      });
       return;
     }
 
-    setIsLoading(true);
+    queueMicrotask(() => {
+      setIsLoading(true);
+    });
     const unsubscribe = subscribeToActivityLogs(projectId, (activityLogs) => {
       setLogs(activityLogs);
       setIsLoading(false);

@@ -47,7 +47,7 @@ import type { Task, List } from '@/types';
 import { LIST_COLORS } from '@/types';
 import { cn } from '@/lib/utils';
 import type { BoardFilters } from './BoardFilterBar';
-import { startOfDay, endOfDay, endOfWeek, isBefore, isAfter, isWithinInterval } from 'date-fns';
+import { startOfDay, endOfDay, endOfWeek, isBefore, isWithinInterval } from 'date-fns';
 
 interface BoardViewProps {
   projectId: string;
@@ -273,7 +273,7 @@ export function BoardView({ projectId, onTaskClick, filters }: BoardViewProps) {
         moveTask(activeId, overTask.listId, overIndex);
       }
     },
-    [tasks, getTasksByListId, moveTask]
+    [tasks, displayLists, getTasksByListId, moveTask]
   );
 
   const handleDragEnd = useCallback(
@@ -417,7 +417,7 @@ export function BoardView({ projectId, onTaskClick, filters }: BoardViewProps) {
       onDragEnd={handleDragEnd}
     >
       <div className="pb-4" data-testid="board-view">
-        <div className="flex min-w-max gap-4">
+        <div className="flex w-fit gap-4">
           <SortableContext
             items={displayLists.map((l) => l.id)}
             strategy={horizontalListSortingStrategy}

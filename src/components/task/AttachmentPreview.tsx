@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 import {
   Dialog,
@@ -14,7 +15,6 @@ import {
   FileAudio,
   FileVideo,
   File,
-  X,
 } from 'lucide-react';
 import { formatFileSize } from '@/lib/firebase/storage';
 import { cn } from '@/lib/utils';
@@ -96,7 +96,7 @@ function canPreview(type: string, name: string): 'image' | 'video' | 'audio' | '
   return null;
 }
 
-export function AttachmentPreview({ id, name, url, type, size, compact = false }: AttachmentPreviewProps) {
+export function AttachmentPreview({ name, url, type, size, compact = false }: AttachmentPreviewProps) {
   const [isOpen, setIsOpen] = useState(false);
   const previewType = canPreview(type, name);
   const icon = getFileIcon(type, name);
@@ -121,11 +121,15 @@ export function AttachmentPreview({ id, name, url, type, size, compact = false }
         )}
       >
         {type.startsWith('image/') ? (
-          <img
-            src={url}
-            alt={name}
-            className="h-24 w-full rounded-t object-cover"
-          />
+          <div className="relative h-24 w-full">
+            <Image
+              src={url}
+              alt={name}
+              fill
+              sizes="(max-width: 768px) 100vw, 320px"
+              className="rounded-t object-cover"
+            />
+          </div>
         ) : (
           <div className="flex h-24 w-full items-center justify-center rounded-t bg-muted">
             {icon || <FileIcon className="h-8 w-8 text-muted-foreground" />}
@@ -163,11 +167,15 @@ export function AttachmentPreview({ id, name, url, type, size, compact = false }
             {/* Preview Content */}
             <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-muted/30">
               {previewType === 'image' && (
-                <img
-                  src={url}
-                  alt={name}
-                  className="max-w-full max-h-[70vh] object-contain rounded"
-                />
+                <div className="relative h-[70vh] w-full">
+                  <Image
+                    src={url}
+                    alt={name}
+                    fill
+                    sizes="100vw"
+                    className="rounded object-contain"
+                  />
+                </div>
               )}
               {previewType === 'video' && (
                 <video
@@ -201,7 +209,7 @@ export function AttachmentPreview({ id, name, url, type, size, compact = false }
 }
 
 // Compact version for comment attachments - Slack/Jooto style
-export function AttachmentPreviewCompact({ id, name, url, type, size }: AttachmentPreviewProps) {
+export function AttachmentPreviewCompact({ name, url, type, size }: AttachmentPreviewProps) {
   const [isOpen, setIsOpen] = useState(false);
   const previewType = canPreview(type, name);
   const icon = getFileIcon(type, name);
@@ -221,11 +229,15 @@ export function AttachmentPreviewCompact({ id, name, url, type, size }: Attachme
           onClick={handleClick}
           className="block rounded-lg overflow-hidden border hover:opacity-90 transition-opacity cursor-pointer"
         >
-          <img
-            src={url}
-            alt={name}
-            className="max-w-[200px] max-h-[150px] object-cover"
-          />
+          <div className="relative h-[150px] w-[200px] max-w-[200px]">
+            <Image
+              src={url}
+              alt={name}
+              fill
+              sizes="200px"
+              className="object-cover"
+            />
+          </div>
         </button>
 
         {/* Preview Dialog */}
@@ -249,11 +261,15 @@ export function AttachmentPreviewCompact({ id, name, url, type, size }: Attachme
                 </a>
               </div>
               <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-muted/30">
-                <img
-                  src={url}
-                  alt={name}
-                  className="max-w-full max-h-[70vh] object-contain rounded"
-                />
+                <div className="relative h-[70vh] w-full">
+                  <Image
+                    src={url}
+                    alt={name}
+                    fill
+                    sizes="100vw"
+                    className="rounded object-contain"
+                  />
+                </div>
               </div>
             </div>
           </DialogContent>
@@ -306,11 +322,15 @@ export function AttachmentPreviewCompact({ id, name, url, type, size }: Attachme
             {/* Preview Content */}
             <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-muted/30">
               {previewType === 'image' && (
-                <img
-                  src={url}
-                  alt={name}
-                  className="max-w-full max-h-[70vh] object-contain rounded"
-                />
+                <div className="relative h-[70vh] w-full">
+                  <Image
+                    src={url}
+                    alt={name}
+                    fill
+                    sizes="100vw"
+                    className="rounded object-contain"
+                  />
+                </div>
               )}
               {previewType === 'video' && (
                 <video
