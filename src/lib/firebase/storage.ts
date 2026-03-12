@@ -9,6 +9,10 @@ import {
   createCommentAttachmentUploadDescriptor,
   createUniqueStorageObjectName,
 } from './storageKeys';
+import {
+  isSupportedProjectImageType,
+  PROJECT_IMAGE_UPLOAD_FORMAT_LABEL,
+} from '@/lib/utils/projectImageUpload';
 
 export async function uploadFile(
   projectId: string,
@@ -83,15 +87,13 @@ export function formatFileSize(bytes: number): string {
 
 // Maximum file size for project icons (5MB)
 const MAX_ICON_SIZE = 5 * 1024 * 1024;
-const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-
 export async function uploadProjectIcon(
   projectId: string,
   file: File
 ): Promise<string> {
   // Validate file type
-  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-    throw new Error('画像ファイル（JPG, PNG, GIF, WebP）のみアップロード可能です');
+  if (!isSupportedProjectImageType(file.type)) {
+    throw new Error(`画像ファイル（${PROJECT_IMAGE_UPLOAD_FORMAT_LABEL}）のみアップロード可能です`);
   }
 
   // Validate file size

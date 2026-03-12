@@ -22,6 +22,11 @@ import { deleteProjectIcon, uploadProjectIconBlob, uploadProjectHeaderImageBlob,
 import { ImageCropperDialog } from '@/components/common/ImageCropperDialog';
 import { readFileAsDataURL, readImageUrlAsDataURL } from '@/lib/utils/image';
 import {
+  isSupportedProjectImageType,
+  PROJECT_IMAGE_UPLOAD_ACCEPT,
+  PROJECT_IMAGE_UPLOAD_FORMAT_LABEL,
+} from '@/lib/utils/projectImageUpload';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -148,9 +153,8 @@ export default function ProjectSettingsPage() {
     if (!file) return;
 
     // Validate file type
-    const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      alert('画像ファイル（JPG, PNG, GIF, WebP）のみアップロード可能です');
+    if (!isSupportedProjectImageType(file.type)) {
+      alert(`画像ファイル（${PROJECT_IMAGE_UPLOAD_FORMAT_LABEL}）のみアップロード可能です`);
       return;
     }
 
@@ -220,9 +224,8 @@ export default function ProjectSettingsPage() {
     if (!file) return;
 
     // Validate file type
-    const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      alert('画像ファイル（JPG, PNG, GIF, WebP）のみアップロード可能です');
+    if (!isSupportedProjectImageType(file.type)) {
+      alert(`画像ファイル（${PROJECT_IMAGE_UPLOAD_FORMAT_LABEL}）のみアップロード可能です`);
       return;
     }
 
@@ -417,7 +420,7 @@ export default function ProjectSettingsPage() {
                 )}
                 <div className="text-sm text-muted-foreground">
                   <p>{iconUrl ? '画像を再調整または変更' : '画像をアップロード'}</p>
-                  <p className="text-xs">JPG, PNG, GIF, WebP (最大5MB)</p>
+                  <p className="text-xs">{PROJECT_IMAGE_UPLOAD_FORMAT_LABEL} (最大5MB)</p>
                   {iconUrl && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button
@@ -446,7 +449,7 @@ export default function ProjectSettingsPage() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  accept={PROJECT_IMAGE_UPLOAD_ACCEPT}
                   onChange={handleIconUpload}
                   className="hidden"
                 />
@@ -588,7 +591,7 @@ export default function ProjectSettingsPage() {
               <input
                 ref={headerFileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp"
+                accept={PROJECT_IMAGE_UPLOAD_ACCEPT}
                 onChange={handleHeaderImageUpload}
                 className="hidden"
               />
