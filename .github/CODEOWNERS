@@ -1,13 +1,13 @@
 # Default owners
-* @hgs
+* @Naofumi-1000ri
 
 # Application code
-/src/ @hgs
-/src/app/api/ @hgs
-/src/lib/auth/ @hgs
-/src/lib/firebase/ @hgs
+/src/ @Naofumi-1000ri
+/src/app/api/ @Naofumi-1000ri
+/src/lib/auth/ @Naofumi-1000ri
+/src/lib/firebase/ @Naofumi-1000ri
 
 # Docs and workflow
-/docs/ @hgs
-/.github/ @hgs
-/.github/workflows/ @hgs
+/docs/ @Naofumi-1000ri
+/.github/ @Naofumi-1000ri
+/.github/workflows/ @Naofumi-1000ri
