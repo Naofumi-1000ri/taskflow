@@ -352,10 +352,10 @@ export default function ApiKeysPage() {
                   新規作成
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+              <DialogContent className="max-h-[85vh] overflow-hidden p-0 sm:max-w-lg">
                 {newPlainTextKey ? (
-                  <>
-                    <DialogHeader>
+                  <div className="flex max-h-[85vh] flex-col">
+                    <DialogHeader className="shrink-0 px-6 pt-6">
                       <DialogTitle className="flex items-center gap-2">
                         <CheckCircle2 className="h-5 w-5 text-green-500" />
                         APIキーが作成されました
@@ -364,7 +364,7 @@ export default function ApiKeysPage() {
                         このキーは一度だけ表示されます。必ずコピーして安全な場所に保存してください。
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4 py-4">
+                    <div className="min-h-0 space-y-4 overflow-y-auto px-6 py-4">
                       <div className="rounded-lg bg-muted p-4">
                         <div className="flex items-center gap-2">
                           <code className="flex-1 break-all text-sm font-mono">
@@ -386,19 +386,19 @@ export default function ApiKeysPage() {
                         </p>
                       </div>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="shrink-0 border-t px-6 py-4">
                       <Button onClick={handleCloseCreateDialog}>閉じる</Button>
                     </DialogFooter>
-                  </>
+                  </div>
                 ) : (
-                  <>
-                    <DialogHeader>
+                  <div className="flex max-h-[85vh] flex-col">
+                    <DialogHeader className="shrink-0 px-6 pt-6">
                       <DialogTitle>新規APIキーを作成</DialogTitle>
                       <DialogDescription>
                         APIキーの名前と権限を設定してください
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4 py-4">
+                    <div className="min-h-0 space-y-4 overflow-y-auto px-6 py-4">
                       <div className="space-y-2">
                         <Label htmlFor="key-name">キー名</Label>
                         <Input
@@ -506,7 +506,7 @@ export default function ApiKeysPage() {
                         </div>
                       ) : null}
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="shrink-0 border-t px-6 py-4">
                       <Button variant="outline" onClick={handleCloseCreateDialog}>
                         キャンセル
                       </Button>
@@ -517,7 +517,7 @@ export default function ApiKeysPage() {
                         {isCreating ? '作成中...' : '作成'}
                       </Button>
                     </DialogFooter>
-                  </>
+                  </div>
                 )}
               </DialogContent>
             </Dialog>
