@@ -82,3 +82,5 @@ Because this repository is explicitly blending project management and developmen
 - preserve the source board URL when possible
 - document the triage decision in the Issue thread
 - document any new workflow rule in repository docs when the process changes
+
+See [`AI_DELIVERY_WORKFLOW.md`](./AI_DELIVERY_WORKFLOW.md) for the end-to-end delivery loop after triage, including TaskFlow sync-back comments and the local Codex skill source.
