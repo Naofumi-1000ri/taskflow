@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useProjects } from '@/hooks/useProjects';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,11 +35,14 @@ import {
   formatApiTokenErrorMessage,
   readApiTokenError,
 } from '@/lib/auth/apiTokenErrors';
+import { getApiKeyProjectScopeLabels } from '@/lib/auth/apiKeyProjectScope';
+import { normalizeAllowedProjectIdsForSave } from '@/lib/ai/projectAccess';
 import type { ApiKey, ApiKeyPermission, ApiKeyCreateData } from '@/types/apiKey';
 import { PERMISSION_GROUPS } from '@/types/apiKey';
 
 export default function ApiKeysPage() {
   const { user, firebaseUser } = useAuth();
+  const { projects, isLoading: projectsLoading } = useProjects();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -49,9 +53,16 @@ export default function ApiKeysPage() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [newPlainTextKey, setNewPlainTextKey] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [hasInitializedProjectScope, setHasInitializedProjectScope] = useState(false);
   const [keyToDelete, setKeyToDelete] = useState<ApiKey | null>(null);
   const [listActionError, setListActionError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const projectNameMap = useMemo(
+    () => new Map(projects.map((project) => [project.id, project.name])),
+    [projects]
+  );
 
   const getAuthHeaders = useCallback(async () => {
     if (!firebaseUser) {
@@ -113,6 +124,15 @@ export default function ApiKeysPage() {
     }
   }, [firebaseUser, loadApiKeys, user?.id]);
 
+  useEffect(() => {
+    if (!isCreateDialogOpen || hasInitializedProjectScope || projectsLoading) {
+      return;
+    }
+
+    setSelectedProjectIds(projects.map((project) => project.id));
+    setHasInitializedProjectScope(true);
+  }, [hasInitializedProjectScope, isCreateDialogOpen, projects, projectsLoading]);
+
   const handleCreateKey = async () => {
     if (!user?.id || !firebaseUser || !newKeyName.trim()) {
       setCreateError('ログイン状態を確認できませんでした。ページを再読み込みして、もう一度お試しください。');
@@ -125,7 +145,10 @@ export default function ApiKeysPage() {
       const data: ApiKeyCreateData = {
         name: newKeyName.trim(),
         permissions: selectedPermissions,
-        projectIds: null, // All projects for now
+        projectIds: normalizeAllowedProjectIdsForSave(
+          selectedProjectIds,
+          projects.map((project) => project.id)
+        ),
         expiresAt: null, // Never expires for now
       };
 
@@ -172,6 +195,8 @@ export default function ApiKeysPage() {
     setIsCreateDialogOpen(false);
     setNewKeyName('');
     setSelectedPermissions(['tasks:read']);
+    setSelectedProjectIds([]);
+    setHasInitializedProjectScope(false);
     setNewPlainTextKey(null);
     setCopiedKey(false);
     setCreateError(null);
@@ -284,6 +309,14 @@ export default function ApiKeysPage() {
       'admin': '全権限',
     };
     return labels[permission];
+  };
+
+  const toggleProjectScope = (projectId: string) => {
+    setSelectedProjectIds((current) =>
+      current.includes(projectId)
+        ? current.filter((id) => id !== projectId)
+        : [...current, projectId]
+    );
   };
 
   return (
@@ -404,6 +437,68 @@ export default function ApiKeysPage() {
                           </div>
                         ))}
                       </div>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label>対象プロジェクト</Label>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedProjectIds(projects.map((project) => project.id))}
+                              disabled={projectsLoading || projects.length === 0}
+                            >
+                              すべて選択
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedProjectIds([])}
+                              disabled={projectsLoading || projects.length === 0}
+                            >
+                              すべて解除
+                            </Button>
+                          </div>
+                        </div>
+
+                        {projectsLoading ? (
+                          <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
+                            プロジェクトを読み込み中...
+                          </div>
+                        ) : projects.length === 0 ? (
+                          <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
+                            プロジェクトがありません。作成後にスコープを選択できます。
+                          </div>
+                        ) : (
+                          <div className="space-y-2 rounded-md border p-3">
+                            {projects.map((project) => (
+                              <div key={project.id} className="flex items-start gap-3">
+                                <Checkbox
+                                  id={`token-project-${project.id}`}
+                                  checked={selectedProjectIds.includes(project.id)}
+                                  onCheckedChange={() => toggleProjectScope(project.id)}
+                                />
+                                <div className="grid gap-0.5 leading-none">
+                                  <label
+                                    htmlFor={`token-project-${project.id}`}
+                                    className="cursor-pointer text-sm font-medium"
+                                  >
+                                    {project.name}
+                                  </label>
+                                  <p className="text-xs text-muted-foreground">
+                                    {project.description || 'このプロジェクトへのAPIアクセスを許可'}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <p className="text-xs text-muted-foreground">
+                          すべて選択した場合は全プロジェクト対象として保存されます。未選択のプロジェクトにはこのキーからアクセスできません。
+                        </p>
+                      </div>
                       {createError ? (
                         <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-3">
                           <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" />
@@ -417,7 +512,7 @@ export default function ApiKeysPage() {
                       </Button>
                       <Button
                         onClick={handleCreateKey}
-                        disabled={!newKeyName.trim() || selectedPermissions.length === 0 || isCreating}
+                        disabled={!newKeyName.trim() || selectedPermissions.length === 0 || isCreating || projectsLoading}
                       >
                         {isCreating ? '作成中...' : '作成'}
                       </Button>
@@ -480,6 +575,13 @@ export default function ApiKeysPage() {
                         {key.permissions.map((perm) => (
                           <Badge key={perm} variant="outline" className="text-xs">
                             {getPermissionLabel(perm)}
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {getApiKeyProjectScopeLabels(key.projectIds, projectNameMap).map((label) => (
+                          <Badge key={`${key.id}-${label}`} variant="secondary" className="text-xs">
+                            {label}
                           </Badge>
                         ))}
                       </div>
