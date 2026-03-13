@@ -118,6 +118,8 @@ export interface Comment {
   taskId: string;
   content: string;
   authorId: string;
+  authorLabel?: string;
+  authorIcon?: string | null;
   mentions: string[];
   attachments?: CommentAttachment[];
   createdAt: Date;

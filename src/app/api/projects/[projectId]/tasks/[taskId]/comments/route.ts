@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/auth/authenticateRequest';
 import { getProjectAccess } from '@/lib/auth/projectAccess';
 import { createProjectTaskComment } from '@/lib/firebase/admin-projects';
+import { getUserProfileSummary } from '@/lib/firebase/admin';
 
 interface RouteContext {
   params: Promise<{
@@ -58,7 +59,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const body = await request.json();
     const commentInput = parseCreateCommentBody(body);
-    const result = await createProjectTaskComment(projectId, taskId, auth.userId, commentInput);
+    let authorLabel: string | undefined;
+    let authorIcon: string | null | undefined;
+
+    if (auth.authType === 'api-token') {
+      const profile = await getUserProfileSummary(auth.userId);
+      const actorName = auth.actorDisplayName || auth.tokenName || 'API Token';
+      authorLabel = profile.displayName
+        ? `${profile.displayName} via ${actorName}`
+        : actorName;
+      authorIcon = auth.actorIcon;
+    }
+
+    const result = await createProjectTaskComment(projectId, taskId, auth.userId, {
+      ...commentInput,
+      authorLabel,
+      authorIcon,
+    });
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';

@@ -43,6 +43,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
 
+    const actorDisplayName =
+      typeof body.actorDisplayName === 'string' && body.actorDisplayName.trim()
+        ? body.actorDisplayName.trim()
+        : null;
+    if (actorDisplayName && actorDisplayName.length > 60) {
+      return NextResponse.json({ error: 'actorDisplayName must be 60 characters or fewer' }, { status: 400 });
+    }
+
+    const actorIcon =
+      typeof body.actorIcon === 'string' && body.actorIcon.trim()
+        ? body.actorIcon.trim()
+        : null;
+    if (actorIcon && actorIcon.length > 8) {
+      return NextResponse.json({ error: 'actorIcon must be 8 characters or fewer' }, { status: 400 });
+    }
+
     const permissions = Array.isArray(body.permissions)
       ? body.permissions.filter((permission): permission is ApiKeyPermission => typeof permission === 'string' && isApiKeyPermission(permission))
       : [];
@@ -66,6 +82,8 @@ export async function POST(request: NextRequest) {
 
     const { apiKey, plainTextKey } = await createApiToken(user.uid, {
       name,
+      actorDisplayName,
+      actorIcon,
       permissions,
       projectIds,
       expiresAt,

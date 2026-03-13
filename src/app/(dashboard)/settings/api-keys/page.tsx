@@ -40,6 +40,8 @@ import { normalizeAllowedProjectIdsForSave } from '@/lib/ai/projectAccess';
 import type { ApiKey, ApiKeyPermission, ApiKeyCreateData } from '@/types/apiKey';
 import { PERMISSION_GROUPS } from '@/types/apiKey';
 
+const ACTOR_ICON_PRESETS = ['🤖', '🧠', '🛠️', '💬', '⚙️'];
+
 export default function ApiKeysPage() {
   const { user, firebaseUser } = useAuth();
   const { projects, isLoading: projectsLoading } = useProjects();
@@ -48,6 +50,8 @@ export default function ApiKeysPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
+  const [newActorDisplayName, setNewActorDisplayName] = useState('');
+  const [newActorIcon, setNewActorIcon] = useState('🤖');
   const [selectedPermissions, setSelectedPermissions] = useState<ApiKeyPermission[]>(['tasks:read']);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -144,6 +148,8 @@ export default function ApiKeysPage() {
     try {
       const data: ApiKeyCreateData = {
         name: newKeyName.trim(),
+        actorDisplayName: newActorDisplayName.trim() || null,
+        actorIcon: newActorIcon.trim() || null,
         permissions: selectedPermissions,
         projectIds: normalizeAllowedProjectIdsForSave(
           selectedProjectIds,
@@ -194,6 +200,8 @@ export default function ApiKeysPage() {
   const handleCloseCreateDialog = () => {
     setIsCreateDialogOpen(false);
     setNewKeyName('');
+    setNewActorDisplayName('');
+    setNewActorIcon('🤖');
     setSelectedPermissions(['tasks:read']);
     setSelectedProjectIds([]);
     setHasInitializedProjectScope(false);
@@ -400,13 +408,53 @@ export default function ApiKeysPage() {
                     </DialogHeader>
                     <div className="min-h-0 space-y-4 overflow-y-auto px-6 py-4">
                       <div className="space-y-2">
-                        <Label htmlFor="key-name">キー名</Label>
+                        <Label htmlFor="key-name">管理名</Label>
                         <Input
                           id="key-name"
                           placeholder="例: Claude Desktop用"
                           value={newKeyName}
                           onChange={(e) => setNewKeyName(e.target.value)}
                         />
+                        <p className="text-xs text-muted-foreground">
+                          APIキー一覧で見分けるための内部名です。
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="actor-display-name">表示名</Label>
+                        <Input
+                          id="actor-display-name"
+                          placeholder="例: Codex"
+                          value={newActorDisplayName}
+                          onChange={(e) => setNewActorDisplayName(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          コメントや監査表示では `ユーザー名 via 表示名` として表示されます。未設定時は管理名を使います。
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="actor-icon">アイコン</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="actor-icon"
+                            className="w-20 text-center text-xl"
+                            placeholder="🤖"
+                            value={newActorIcon}
+                            onChange={(e) => setNewActorIcon(e.target.value)}
+                          />
+                          <div className="flex flex-wrap gap-2">
+                            {ACTOR_ICON_PRESETS.map((icon) => (
+                              <Button
+                                key={icon}
+                                type="button"
+                                variant={newActorIcon === icon ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setNewActorIcon(icon)}
+                              >
+                                {icon}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                       <div className="space-y-3">
                         <Label>権限</Label>
@@ -565,6 +613,10 @@ export default function ApiKeysPage() {
                         {!key.isActive && (
                           <Badge variant="secondary">無効</Badge>
                         )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>{key.actorIcon || '🤖'}</span>
+                        <span>{key.actorDisplayName || key.name}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <code className="text-sm text-muted-foreground font-mono">

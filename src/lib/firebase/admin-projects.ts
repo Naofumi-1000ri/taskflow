@@ -83,6 +83,8 @@ export interface ProjectTaskCommentItem {
   taskId: string;
   content: string;
   authorId: string;
+  authorLabel?: string;
+  authorIcon?: string | null;
   mentions: string[];
   attachments: CommentAttachment[];
   createdAt: string | null;
@@ -211,6 +213,8 @@ function mapCommentToApiItem(
     taskId,
     content: typeof data.content === 'string' ? data.content : '',
     authorId: typeof data.authorId === 'string' ? data.authorId : '',
+    authorLabel: typeof data.authorLabel === 'string' ? data.authorLabel : undefined,
+    authorIcon: typeof data.authorIcon === 'string' ? data.authorIcon : null,
     mentions:
       Array.isArray(data.mentions) && data.mentions.every((item) => typeof item === 'string')
         ? data.mentions
@@ -691,6 +695,8 @@ export async function createProjectTaskComment(
   input: {
     content: string;
     mentions?: string[];
+    authorLabel?: string;
+    authorIcon?: string | null;
   }
 ): Promise<{ comment: ProjectTaskCommentItem }> {
   const db = getAdminDb();
@@ -711,6 +717,8 @@ export async function createProjectTaskComment(
       taskId,
       content: input.content,
       authorId: userId,
+      authorLabel: input.authorLabel,
+      authorIcon: input.authorIcon ?? null,
       mentions: input.mentions ?? [],
       attachments: [],
       createdAt: now,

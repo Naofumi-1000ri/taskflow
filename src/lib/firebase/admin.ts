@@ -148,3 +148,20 @@ export async function saveUserAIProjectAccessSettings(
     { merge: true }
   );
 }
+
+export async function getUserProfileSummary(
+  userId: string
+): Promise<{ displayName: string | null; photoURL: string | null }> {
+  const db = getAdminDb();
+  const userDoc = await db.collection('users').doc(userId).get();
+
+  if (!userDoc.exists) {
+    return { displayName: null, photoURL: null };
+  }
+
+  const data = userDoc.data();
+  return {
+    displayName: typeof data?.displayName === 'string' ? data.displayName : null,
+    photoURL: typeof data?.photoURL === 'string' ? data.photoURL : null,
+  };
+}

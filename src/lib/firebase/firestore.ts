@@ -737,6 +737,8 @@ export async function createComment(
     {
       content: data.content,
       authorId: data.authorId,
+      authorLabel: data.authorLabel,
+      authorIcon: data.authorIcon ?? null,
       mentions: data.mentions || [],
       attachments: data.attachments || [],
       taskId,

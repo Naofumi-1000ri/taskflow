@@ -5,6 +5,9 @@ import { verifyAuthToken } from '@/lib/firebase/admin';
 export interface AuthenticatedRequest {
   userId: string;
   authType: 'firebase' | 'api-token';
+  tokenName: string | null;
+  actorDisplayName: string | null;
+  actorIcon: string | null;
   permissions: ApiKeyPermission[] | null;
   projectIds: string[] | null;
   tokenId: string | null;
@@ -26,6 +29,9 @@ export async function authenticateRequest(authHeader: string | null): Promise<Au
     return {
       userId: apiToken.userId,
       authType: 'api-token',
+      tokenName: apiToken.name,
+      actorDisplayName: apiToken.actorDisplayName,
+      actorIcon: apiToken.actorIcon,
       permissions: apiToken.permissions,
       projectIds: apiToken.projectIds,
       tokenId: apiToken.id,
@@ -36,6 +42,9 @@ export async function authenticateRequest(authHeader: string | null): Promise<Au
   return {
     userId: firebaseUser.uid,
     authType: 'firebase',
+    tokenName: null,
+    actorDisplayName: null,
+    actorIcon: null,
     permissions: null,
     projectIds: null,
     tokenId: null,

@@ -36,6 +36,8 @@ export async function createApiKey(
 
   const docRef = await addDoc(collection(db, 'apiKeys'), {
     name: data.name,
+    actorDisplayName: data.actorDisplayName,
+    actorIcon: data.actorIcon,
     keyPrefix,
     keyHash,
     userId,
@@ -50,6 +52,8 @@ export async function createApiKey(
   const apiKey: ApiKey = {
     id: docRef.id,
     name: data.name,
+    actorDisplayName: data.actorDisplayName,
+    actorIcon: data.actorIcon,
     keyPrefix,
     keyHash,
     userId,
@@ -79,6 +83,8 @@ export async function getUserApiKeys(userId: string): Promise<ApiKey[]> {
     return {
       id: doc.id,
       name: data.name,
+      actorDisplayName: data.actorDisplayName || null,
+      actorIcon: data.actorIcon || null,
       keyPrefix: data.keyPrefix,
       keyHash: data.keyHash,
       userId: data.userId,
@@ -128,6 +134,8 @@ export async function validateApiKey(plainTextKey: string): Promise<ApiKey | nul
   return {
     id: doc.id,
     name: data.name,
+    actorDisplayName: data.actorDisplayName || null,
+    actorIcon: data.actorIcon || null,
     keyPrefix: data.keyPrefix,
     keyHash: data.keyHash,
     userId: data.userId,
