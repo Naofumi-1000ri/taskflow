@@ -4,6 +4,8 @@ import type { ApiKey, ApiKeyCreateData, ApiKeyPermission } from '@/types/apiKey'
 
 interface ApiTokenDoc {
   name: string;
+  actorDisplayName: string | null;
+  actorIcon: string | null;
   keyPrefix: string;
   keyHash: string;
   permissions: ApiKeyPermission[];
@@ -17,6 +19,9 @@ interface ApiTokenDoc {
 export interface AuthenticatedApiToken {
   id: string;
   userId: string;
+  name: string;
+  actorDisplayName: string | null;
+  actorIcon: string | null;
   permissions: ApiKeyPermission[];
   projectIds: string[] | null;
 }
@@ -45,6 +50,8 @@ function mapApiKey(
     id,
     userId,
     name: data.name,
+    actorDisplayName: typeof data.actorDisplayName === 'string' ? data.actorDisplayName : null,
+    actorIcon: typeof data.actorIcon === 'string' ? data.actorIcon : null,
     keyPrefix: data.keyPrefix,
     keyHash: data.keyHash,
     permissions: Array.isArray(data.permissions) ? data.permissions : [],
@@ -71,6 +78,8 @@ export async function createApiToken(
     .collection('apiTokens')
     .add({
       name: data.name,
+      actorDisplayName: data.actorDisplayName,
+      actorIcon: data.actorIcon,
       keyPrefix,
       keyHash,
       permissions: data.permissions,
@@ -86,6 +95,8 @@ export async function createApiToken(
       id: docRef.id,
       userId,
       name: data.name,
+      actorDisplayName: data.actorDisplayName,
+      actorIcon: data.actorIcon,
       keyPrefix,
       keyHash,
       permissions: data.permissions,
@@ -174,6 +185,9 @@ export async function validateApiToken(token: string): Promise<AuthenticatedApiT
   return {
     id: tokenDoc.id,
     userId: parentUserRef.id,
+    name: data.name,
+    actorDisplayName: typeof data.actorDisplayName === 'string' ? data.actorDisplayName : null,
+    actorIcon: typeof data.actorIcon === 'string' ? data.actorIcon : null,
     permissions: Array.isArray(data.permissions) ? data.permissions : [],
     projectIds: Array.isArray(data.projectIds) ? data.projectIds : null,
   };

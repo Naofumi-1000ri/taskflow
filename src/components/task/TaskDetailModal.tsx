@@ -1119,14 +1119,17 @@ export function TaskDetailModal({
                   <div className="mb-4 space-y-3">
                     {comments.map((comment) => {
                       const author = commentAuthors[comment.authorId];
-                      const authorName = author?.displayName || 'Unknown';
+                      const authorName = comment.authorLabel || author?.displayName || 'Unknown';
                       const authorInitials = authorName.slice(0, 2).toUpperCase();
+                      const authorAvatarText = comment.authorIcon || authorInitials;
                       const isEditing = editingCommentId === comment.id;
                       const isEdited = comment.updatedAt && comment.updatedAt.getTime() !== comment.createdAt.getTime();
                       return (
                         <div key={comment.id} className="group flex gap-3">
                           <div className="h-8 w-8 flex-shrink-0 rounded-full bg-muted flex items-center justify-center text-xs font-medium overflow-hidden">
-                            {author?.photoURL ? (
+                            {comment.authorIcon ? (
+                              <span className="text-sm">{authorAvatarText}</span>
+                            ) : author?.photoURL ? (
                               <Image
                                 src={author.photoURL}
                                 alt={authorName}
@@ -1135,7 +1138,7 @@ export function TaskDetailModal({
                                 className="h-full w-full object-cover"
                               />
                             ) : (
-                              authorInitials
+                              authorAvatarText
                             )}
                           </div>
                           <div className="min-w-0 flex-1">

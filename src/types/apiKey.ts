@@ -11,6 +11,8 @@ export type ApiKeyPermission =
 export interface ApiKey {
   id: string;
   name: string;
+  actorDisplayName: string | null;
+  actorIcon: string | null;
   keyPrefix: string;           // First 8 chars for display (e.g., "tf_abc123...")
   keyHash: string;             // SHA-256 hash of full key
   userId: string;              // Owner user ID
@@ -24,6 +26,8 @@ export interface ApiKey {
 
 export interface ApiKeyCreateData {
   name: string;
+  actorDisplayName: string | null;
+  actorIcon: string | null;
   permissions: ApiKeyPermission[];
   projectIds: string[] | null;
   expiresAt: Date | null;

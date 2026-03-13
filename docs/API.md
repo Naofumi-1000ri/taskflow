@@ -29,11 +29,16 @@ Request body:
 ```json
 {
   "name": "Claude Desktop",
+  "actorDisplayName": "Codex",
+  "actorIcon": "🤖",
   "permissions": ["projects:read", "tasks:read", "tasks:write"],
   "projectIds": null,
   "expiresAt": null
 }
 ```
+
+`name` is the management label for the token itself.
+`actorDisplayName` and `actorIcon` are optional audit-facing metadata used when TaskFlow shows actions performed via that token.
 
 ### `PATCH /api/auth/tokens/[tokenId]`
 
@@ -155,6 +160,11 @@ Supports:
 
 - content
 - mentions
+
+If the request is authenticated with a personal access token, TaskFlow may also persist audit-facing author metadata such as:
+
+- `authorLabel` like `Naofumi via Codex`
+- `authorIcon` like `🤖`
 
 Notes:
 
