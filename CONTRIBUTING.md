@@ -89,3 +89,4 @@ When changing APIs or Firebase data shapes:
 - call out compatibility concerns in the PR
 
 See [`docs/TASKFLOW_GITHUB_TRIAGE.md`](./docs/TASKFLOW_GITHUB_TRIAGE.md) for the TaskFlow-to-GitHub backlog handoff rules.
+See [`docs/AI_DELIVERY_WORKFLOW.md`](./docs/AI_DELIVERY_WORKFLOW.md) for the full TaskFlow-to-GitHub delivery loop and sync-back expectations.

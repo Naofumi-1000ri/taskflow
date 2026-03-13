@@ -1,0 +1,4 @@
+interface:
+  display_name: "TaskFlow GitHub Delivery"
+  short_description: "Triage TaskFlow tasks and sync GitHub delivery."
+  default_prompt: "Triage the TaskFlow task, decide whether it is already implemented or needs work, create or update the matching GitHub issue, implement the change if needed, and sync an [AIからのメッセージ] comment with issue and PR details back to TaskFlow."

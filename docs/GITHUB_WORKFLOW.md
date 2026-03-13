@@ -85,6 +85,7 @@ Suggested automation rules:
 - merged PR closes Issue and moves it to `Done`
 
 For TaskFlow board items that are synced into GitHub Issues, follow the triage rules in [`TASKFLOW_GITHUB_TRIAGE.md`](./TASKFLOW_GITHUB_TRIAGE.md) before implementation starts.
+Use [`AI_DELIVERY_WORKFLOW.md`](./AI_DELIVERY_WORKFLOW.md) when the work also needs TaskFlow sync-back comments and Codex skill support.
 
 ## Branch Protection
 
