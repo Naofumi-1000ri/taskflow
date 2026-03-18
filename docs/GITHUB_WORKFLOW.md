@@ -79,7 +79,7 @@ Recommended columns:
 Suggested automation rules:
 
 - new Issues go to `Backlog`
-- assigned and scoped Issues move to `Ready`
+- scoped Issues move to `Ready`
 - linked PR opened moves Issue to `In Progress`
 - PR in review moves Issue to `Review`
 - merged PR closes Issue and moves it to `Done`
@@ -124,6 +124,12 @@ Repository merge settings should be:
 - rebase merge disabled
 - delete branch on merge enabled
 
+Production deployment:
+
+- `taskflow-deploy` runs after `taskflow-ci` succeeds on a `main` push
+- deploy configuration lives in [`DEPLOYMENT.md`](./DEPLOYMENT.md)
+- deploy is post-merge and does not replace the required PR checks
+
 ## Dependency Maintenance
 
 Dependency upkeep is automated with:
@@ -154,9 +160,7 @@ Current Project v2 workflow:
 Manual rules:
 
 - move new scoped issues into `Ready` only when acceptance criteria are clear
-- move an issue to `In Progress` when implementation starts, not when it is merely discussed
-- move an issue to `Review` when the linked PR is open
-- move an issue to `Done` only after the change is merged or intentionally completed without code
+- use a closing issue reference in every PR body, such as `Closes #123`
 
 TaskFlow-imported Issues should not move to `Ready` until they have an explicit `AI triage` comment that classifies them as:
 
@@ -165,11 +169,18 @@ TaskFlow-imported Issues should not move to `Ready` until they have an explicit 
 - `reproducible gap`
 - `needs clarification`
 
-Automation candidates to revisit later:
+Current automation:
 
-- set `In Progress` when a linked PR opens
-- set `Review` when a PR is marked ready for review
-- set `Done` on merge or close with resolution
+- `taskflow-project-automation` adds new Issues to the configured Project v2 and sets `Backlog`
+- `taskflow-project-automation` moves linked Issues to `In Progress` when a PR opens or returns to draft
+- `taskflow-project-automation` moves linked Issues to `Review` when a PR is marked ready for review
+- `taskflow-project-automation` moves linked Issues to `Done` on merge
+- `taskflow-project-automation` moves linked Issues back to `Ready` if a PR closes without merge
+
+Manual only:
+
+- moving scoped work from `Backlog` to `Ready`
+- triaging imported TaskFlow work before it becomes `Ready`
 
 If the project adds more maintainers later, re-enable:
 

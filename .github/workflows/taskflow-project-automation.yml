@@ -1,0 +1,257 @@
+name: taskflow-project-automation
+
+on:
+  issues:
+    types:
+      - opened
+      - reopened
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - ready_for_review
+      - converted_to_draft
+      - closed
+
+jobs:
+  sync-project-status:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+
+    steps:
+      - name: Sync Project v2 status
+        uses: actions/github-script@v7
+        env:
+          PROJECTV2_OWNER: ${{ vars.GH_PROJECTV2_OWNER }}
+          PROJECTV2_NUMBER: ${{ vars.GH_PROJECTV2_NUMBER }}
+          PROJECTV2_TOKEN: ${{ secrets.PROJECTV2_TOKEN }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const ownerLogin = process.env.PROJECTV2_OWNER || context.repo.owner;
+            const projectNumberRaw = process.env.PROJECTV2_NUMBER?.trim();
+            const projectToken = process.env.PROJECTV2_TOKEN?.trim();
+
+            if (!projectToken || !projectNumberRaw) {
+              core.notice(
+                'Skipping Project v2 sync because PROJECTV2_TOKEN or GH_PROJECTV2_NUMBER is not configured.'
+              );
+              return;
+            }
+
+            const projectNumber = Number(projectNumberRaw);
+            if (!Number.isInteger(projectNumber) || projectNumber <= 0) {
+              core.setFailed(`Invalid GH_PROJECTV2_NUMBER: ${projectNumberRaw}`);
+              return;
+            }
+
+            async function graphQL(query, variables) {
+              const response = await fetch('https://api.github.com/graphql', {
+                method: 'POST',
+                headers: {
+                  Authorization: `bearer ${projectToken}`,
+                  'Content-Type': 'application/json',
+                  'User-Agent': 'taskflow-project-automation',
+                },
+                body: JSON.stringify({ query, variables }),
+              });
+
+              const payload = await response.json();
+              if (!response.ok || payload.errors) {
+                throw new Error(
+                  `GitHub GraphQL request failed: ${JSON.stringify(payload.errors || payload)}`
+                );
+              }
+
+              return payload.data;
+            }
+
+            async function getProjectConfig() {
+              const { data: owner } = await github.rest.users.getByUsername({
+                username: ownerLogin,
+              });
+              const ownerField = owner.type === 'Organization' ? 'organization' : 'user';
+              const data = await graphQL(
+                `query($owner: String!, $number: Int!) {
+                  ${ownerField}(login: $owner) {
+                    projectV2(number: $number) {
+                      id
+                      title
+                      fields(first: 50) {
+                        nodes {
+                          __typename
+                          ... on ProjectV2SingleSelectField {
+                            id
+                            name
+                            options {
+                              id
+                              name
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }`,
+                {
+                  owner: ownerLogin,
+                  number: projectNumber,
+                }
+              );
+
+              const project = data?.[ownerField]?.projectV2;
+              if (!project) {
+                throw new Error(`Project v2 ${ownerLogin}/${projectNumber} not found`);
+              }
+
+              const statusField = project.fields.nodes.find(
+                (field) => field.__typename === 'ProjectV2SingleSelectField' && field.name === 'Status'
+              );
+
+              if (!statusField) {
+                throw new Error('Project v2 is missing a single-select field named "Status"');
+              }
+
+              return { project, statusField };
+            }
+
+            async function getProjectItem(contentId, projectId) {
+              const data = await graphQL(
+                `query($contentId: ID!) {
+                  node(id: $contentId) {
+                    ... on Issue {
+                      projectItems(first: 20) {
+                        nodes {
+                          id
+                          project {
+                            id
+                          }
+                        }
+                      }
+                    }
+                    ... on PullRequest {
+                      projectItems(first: 20) {
+                        nodes {
+                          id
+                          project {
+                            id
+                          }
+                        }
+                      }
+                    }
+                  }
+                }`,
+                { contentId }
+              );
+
+              const items = data?.node?.projectItems?.nodes || [];
+              return items.find((item) => item.project.id === projectId) || null;
+            }
+
+            async function ensureProjectItem(contentId, projectId) {
+              const existing = await getProjectItem(contentId, projectId);
+              if (existing) {
+                return existing.id;
+              }
+
+              const data = await graphQL(
+                `mutation($projectId: ID!, $contentId: ID!) {
+                  addProjectV2ItemById(input: {
+                    projectId: $projectId
+                    contentId: $contentId
+                  }) {
+                    item {
+                      id
+                    }
+                  }
+                }`,
+                {
+                  projectId,
+                  contentId,
+                }
+              );
+
+              return data.addProjectV2ItemById.item.id;
+            }
+
+            async function setStatus(contentId, statusName, projectConfig) {
+              const option = projectConfig.statusField.options.find(
+                (candidate) => candidate.name === statusName
+              );
+
+              if (!option) {
+                throw new Error(`Project v2 status option "${statusName}" not found`);
+              }
+
+              const itemId = await ensureProjectItem(contentId, projectConfig.project.id);
+              await graphQL(
+                `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $projectId
+                    itemId: $itemId
+                    fieldId: $fieldId
+                    value: { singleSelectOptionId: $optionId }
+                  }) {
+                    projectV2Item {
+                      id
+                    }
+                  }
+                }`,
+                {
+                  projectId: projectConfig.project.id,
+                  itemId,
+                  fieldId: projectConfig.statusField.id,
+                  optionId: option.id,
+                }
+              );
+            }
+
+            function extractLinkedIssueNumbers(body) {
+              const matches = new Set();
+              const pattern = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)\b/gi;
+
+              for (const match of body.matchAll(pattern)) {
+                matches.add(Number(match[1]));
+              }
+
+              return [...matches];
+            }
+
+            const projectConfig = await getProjectConfig();
+
+            if (context.eventName === 'issues') {
+              await setStatus(context.payload.issue.node_id, 'Backlog', projectConfig);
+              core.info(`Synced issue #${context.payload.issue.number} to Backlog`);
+              return;
+            }
+
+            const pullRequest = context.payload.pull_request;
+            const linkedIssueNumbers = extractLinkedIssueNumbers(pullRequest.body || '');
+
+            if (linkedIssueNumbers.length === 0) {
+              core.notice(
+                `Skipping Project v2 PR sync because PR #${pullRequest.number} does not contain a closing issue reference.`
+              );
+              return;
+            }
+
+            let targetStatus = 'In Progress';
+            if (context.payload.action === 'ready_for_review') {
+              targetStatus = 'Review';
+            } else if (context.payload.action === 'closed') {
+              targetStatus = pullRequest.merged ? 'Done' : 'Ready';
+            }
+
+            for (const issueNumber of linkedIssueNumbers) {
+              const { data: issue } = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+              });
+
+              await setStatus(issue.node_id, targetStatus, projectConfig);
+              core.info(`Synced issue #${issueNumber} to ${targetStatus}`);
+            }

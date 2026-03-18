@@ -6,6 +6,7 @@
 ## Linked Issue
 
 - Closes #
+- Required for Project v2 automation
 
 ## Verification
 

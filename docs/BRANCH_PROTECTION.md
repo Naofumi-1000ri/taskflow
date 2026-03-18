@@ -43,6 +43,11 @@ Recommended repository-level merge settings:
 - disable rebase merge
 - delete head branch on merge
 
+## Deploy Behavior
+
+Production deploy is handled after merge by `taskflow-deploy`.
+Do not add deploy as a required pre-merge check. Keep `taskflow-ci` as the merge gate, and let deploy run from the successful `main` build.
+
 ## When To Tighten Rules
 
 If the repository moves beyond single-operator maintenance, turn these back on:
