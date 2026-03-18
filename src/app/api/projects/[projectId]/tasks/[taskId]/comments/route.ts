@@ -73,8 +73,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const result = await createProjectTaskComment(projectId, taskId, auth.userId, {
       ...commentInput,
-      authorLabel,
-      authorIcon,
+      ...(authorLabel !== undefined ? { authorLabel } : {}),
+      ...(authorIcon !== undefined ? { authorIcon } : {}),
     });
     return NextResponse.json(result, { status: 201 });
   } catch (error) {

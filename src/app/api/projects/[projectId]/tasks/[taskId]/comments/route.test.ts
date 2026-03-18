@@ -140,4 +140,48 @@ describe('POST /api/projects/[projectId]/tasks/[taskId]/comments', () => {
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({ error: 'Forbidden' });
   });
+
+  it('omits optional author metadata for non api-token auth', async () => {
+    mockedAuthenticateRequest.mockResolvedValue({
+      userId: 'user-1',
+      authType: 'firebase',
+      tokenName: null,
+      actorDisplayName: null,
+      actorIcon: null,
+      permissions: ['tasks:write'],
+      projectIds: null,
+      tokenId: null,
+    });
+    mockedCreateProjectTaskComment.mockResolvedValue({
+      comment: {
+        id: 'comment-2',
+        taskId: 'task-1',
+        content: 'Session comment',
+        authorId: 'user-1',
+        mentions: [],
+        attachments: [],
+        createdAt: '2026-03-13T00:00:00.000Z',
+        updatedAt: '2026-03-13T00:00:00.000Z',
+      },
+    });
+
+    const request = new NextRequest('http://localhost/api/projects/project-1/tasks/task-1/comments', {
+      method: 'POST',
+      body: JSON.stringify({ content: 'Session comment' }),
+      headers: {
+        Authorization: 'Bearer session_token',
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const response = await POST(request, {
+      params: Promise.resolve({ projectId: 'project-1', taskId: 'task-1' }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(mockedCreateProjectTaskComment).toHaveBeenCalledWith('project-1', 'task-1', 'user-1', {
+      content: 'Session comment',
+      mentions: undefined,
+    });
+  });
 });

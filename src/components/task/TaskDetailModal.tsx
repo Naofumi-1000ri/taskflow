@@ -296,7 +296,7 @@ export function TaskDetailModal({
     if (user && (commentText.trim() || pendingFiles.length > 0)) {
       setIsSubmittingComment(true);
       try {
-        await addComment(commentText.trim(), user.id, [], pendingFiles);
+        await addComment(commentText.trim(), user.id, user.displayName, [], pendingFiles);
         setCommentText('');
         setPendingFiles([]);
       } catch (error) {
