@@ -62,6 +62,10 @@ The helper script for posting AI sync-back comments is:
 
 - `/Users/hgs/devel/project_manager/taskflow/codex-skills/taskflow-github-delivery/scripts/post_taskflow_ai_message.py`
 
+The sequential runner for those agent folders is:
+
+- `/Users/hgs/devel/project_manager/taskflow/codex-skills/taskflow-github-delivery/scripts/run_delivery_agents.py`
+
 ## Related Docs
 
 - [`TASKFLOW_GITHUB_TRIAGE.md`](./TASKFLOW_GITHUB_TRIAGE.md)

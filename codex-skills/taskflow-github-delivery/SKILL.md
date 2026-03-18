@@ -58,4 +58,5 @@ Keep each folder single-purpose; do not fold review or merge responsibilities ba
 ## Resources
 
 - Read `references/workflow.md` for the exact checklist and sync-back expectations.
+- Use `scripts/run_delivery_agents.py` when you want to run `issue-to-code` -> `pr-review` -> `merge-deploy` in sequence with fail-fast and retry limits.
 - Run `scripts/post_taskflow_ai_message.py --help` to post `[AIからのメッセージ]` comments back to TaskFlow.
