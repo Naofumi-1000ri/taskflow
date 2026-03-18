@@ -187,7 +187,13 @@ export function useTaskDetails(projectId: string | null, taskId: string | null) 
 
   // Add comment (with optional attachments)
   const addComment = useCallback(
-    async (content: string, authorId: string, mentions: string[] = [], files: File[] = []) => {
+    async (
+      content: string,
+      authorId: string,
+      authorLabel?: string,
+      mentions: string[] = [],
+      files: File[] = []
+    ) => {
       if (!projectId || !taskId) return;
 
       // Upload attachments first
@@ -202,6 +208,7 @@ export function useTaskDetails(projectId: string | null, taskId: string | null) 
       await createComment(projectId, taskId, {
         content,
         authorId,
+        authorLabel,
         mentions,
         attachments: commentAttachments,
       });

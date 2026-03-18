@@ -26,6 +26,12 @@ interface AdminList {
   autoCompleteOnEnter?: boolean;
 }
 
+function omitUndefinedFields<T extends Record<string, unknown>>(data: T): T {
+  return Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined)
+  ) as T;
+}
+
 export interface ProjectStatusSummary {
   totalTasks: number;
   completedTasks: number;
@@ -713,7 +719,7 @@ export async function createProjectTaskComment(
     .collection('tasks')
     .doc(taskId)
     .collection('comments')
-    .add({
+    .add(omitUndefinedFields({
       taskId,
       content: input.content,
       authorId: userId,
@@ -723,7 +729,7 @@ export async function createProjectTaskComment(
       attachments: [],
       createdAt: now,
       updatedAt: now,
-    });
+    }));
 
   const commentSnapshot = await commentRef.get();
   if (!commentSnapshot.exists) {

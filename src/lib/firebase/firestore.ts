@@ -64,6 +64,12 @@ function convertDoc<T>(doc: DocumentData, id: string): T {
   } as T;
 }
 
+function omitUndefinedFields<T extends Record<string, unknown>>(data: T): T {
+  return Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined)
+  ) as T;
+}
+
 // ==================== Projects ====================
 
 export async function createProject(
@@ -734,7 +740,7 @@ export async function createComment(
   const db = getFirebaseDb();
   const commentRef = await addDoc(
     collection(db, 'projects', projectId, 'tasks', taskId, 'comments'),
-    {
+    omitUndefinedFields({
       content: data.content,
       authorId: data.authorId,
       authorLabel: data.authorLabel,
@@ -744,7 +750,7 @@ export async function createComment(
       taskId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    }
+    })
   );
   return commentRef.id;
 }
