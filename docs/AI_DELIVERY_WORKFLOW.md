@@ -44,6 +44,16 @@ Versioned skill source lives in:
 
 - `/Users/hgs/devel/project_manager/taskflow/codex-skills/taskflow-github-delivery`
 
+Single-function agent folders live under:
+
+- `/Users/hgs/devel/project_manager/taskflow/codex-skills/taskflow-github-delivery/agents/issue-to-code`
+- `/Users/hgs/devel/project_manager/taskflow/codex-skills/taskflow-github-delivery/agents/pr-review`
+- `/Users/hgs/devel/project_manager/taskflow/codex-skills/taskflow-github-delivery/agents/merge-deploy`
+
+The handoff contract between those folders is:
+
+- `/Users/hgs/devel/project_manager/taskflow/codex-skills/taskflow-github-delivery/agents/pipeline.yaml`
+
 The installed local copy lives in:
 
 - `$CODEX_HOME/skills/taskflow-github-delivery`
@@ -51,6 +61,10 @@ The installed local copy lives in:
 The helper script for posting AI sync-back comments is:
 
 - `/Users/hgs/devel/project_manager/taskflow/codex-skills/taskflow-github-delivery/scripts/post_taskflow_ai_message.py`
+
+The sequential runner for those agent folders is:
+
+- `/Users/hgs/devel/project_manager/taskflow/codex-skills/taskflow-github-delivery/scripts/run_delivery_agents.py`
 
 ## Related Docs
 

@@ -1,0 +1,51 @@
+pipeline:
+  orchestrator:
+    folder: "./"
+    role: "Route delivery work across the single-function agent folders."
+  stages:
+    - id: "issue-to-code"
+      folder: "./issue-to-code"
+      goal: "Turn a scoped GitHub issue into a tested PR."
+      input:
+        - "GitHub issue number or URL"
+        - "Current implementation context"
+      output:
+        - "Branch name"
+        - "PR URL"
+        - "Verification summary"
+        - "Open questions for review"
+    - id: "pr-review"
+      folder: "./pr-review"
+      goal: "Review the PR for bugs, regressions, and missing checks."
+      input:
+        - "PR URL"
+        - "Issue URL"
+        - "Verification summary"
+      output:
+        - "Review decision"
+        - "Findings or approval note"
+        - "Merge readiness summary"
+    - id: "merge-deploy"
+      folder: "./merge-deploy"
+      goal: "Merge an accepted PR and confirm the main/deploy result."
+      input:
+        - "PR URL"
+        - "Review decision"
+        - "Merge strategy"
+      output:
+        - "Merge commit SHA"
+        - "Deployment status or URL"
+        - "Final blocker summary when deploy does not complete"
+  handoffs:
+    - from: "issue-to-code"
+      to: "pr-review"
+      requires:
+        - "PR URL"
+        - "Issue URL"
+        - "Verification summary"
+    - from: "pr-review"
+      to: "merge-deploy"
+      requires:
+        - "Review decision"
+        - "Merge readiness summary"
+        - "Merge strategy"

@@ -139,5 +139,6 @@ See [`docs/E2E_STRATEGY.md`](./docs/E2E_STRATEGY.md) for the current test-mode s
 - API token management UI is under `src/app/(dashboard)/settings/api-keys/page.tsx`
 - AI project access settings UI is under `src/app/(dashboard)/settings/ai/page.tsx`
 - Versioned Codex skill source for this delivery loop is under `codex-skills/taskflow-github-delivery/`
+- Single-function delivery agent folders live under `codex-skills/taskflow-github-delivery/agents/`
 - Firebase rules and indexes are versioned in `firestore.rules`, `firestore.indexes.json`, and `storage.rules`
 - Existing AI routes remain under `src/app/api/ai`
