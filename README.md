@@ -66,6 +66,7 @@ Current baseline:
 
 Weekly maintenance automation also runs `taskflow-maintenance`, which uploads a dependency health report and updates a tracking issue when findings exist.
 Known deferred update: `eslint@10.x` is intentionally held back until `eslint-config-next` becomes runtime-compatible.
+Issue-to-PR state sync now runs through `taskflow-project-automation`, and production deploy after merge is handled by `taskflow-deploy` once the required GitHub secrets and vars are configured.
 
 Current GitHub branch policy is tuned for single-operator maintenance:
 
@@ -104,6 +105,7 @@ See [`docs/API.md`](./docs/API.md) for the current API surface and auth model.
 See [`docs/API_INTEGRATION.md`](./docs/API_INTEGRATION.md) for curl examples and integration flow.
 See [`docs/AI_ACCESS_CONTROL.md`](./docs/AI_ACCESS_CONTROL.md) for project-level AI access rules.
 See [`docs/AI_DELIVERY_WORKFLOW.md`](./docs/AI_DELIVERY_WORKFLOW.md) for the TaskFlow-to-GitHub AI delivery loop.
+See [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) for GitHub Project status automation and production deploy setup.
 See [`docs/GITHUB_WORKFLOW.md`](./docs/GITHUB_WORKFLOW.md) for GitHub workflow rules.
 See [`docs/LINT_DEBT.md`](./docs/LINT_DEBT.md) for current lint status and maintenance rules.
 See [`docs/ESLINT10_TRACKING.md`](./docs/ESLINT10_TRACKING.md) for the deferred ESLint 10 upgrade.
