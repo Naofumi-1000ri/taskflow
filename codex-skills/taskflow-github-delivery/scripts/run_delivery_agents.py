@@ -26,9 +26,13 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def new_state() -> dict[str, Any]:
+    return {"createdAt": utc_now(), "stages": {}, "attempts": {"total": 0}, "context": {}}
+
+
 def load_yaml(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
-      loaded = yaml.safe_load(handle)
+        loaded = yaml.safe_load(handle)
     if not isinstance(loaded, dict):
         raise ValueError(f"Expected YAML object in {path}")
     return loaded
@@ -202,10 +206,95 @@ def extract_labeled_value(text: str, label: str) -> str | None:
     return match.group(1) if match else None
 
 
+def extract_context_from_state(
+    state: dict[str, Any], pipeline_ids: list[str]
+) -> tuple[str | None, str | None, str | None]:
+    context = state.get("context", {})
+    issue_url = context.get("issueUrl") if isinstance(context, dict) else None
+    pr_url = context.get("prUrl") if isinstance(context, dict) else None
+    deploy_url = context.get("deployUrl") if isinstance(context, dict) else None
+
+    stages = state.get("stages", {})
+    if not isinstance(stages, dict):
+        return None, None, None
+
+    for stage_id in reversed(pipeline_ids):
+        stage_state = stages.get(stage_id, {})
+        if not isinstance(stage_state, dict):
+            continue
+        if not issue_url and isinstance(stage_state.get("issueUrl"), str):
+            issue_url = stage_state["issueUrl"]
+        if not pr_url and isinstance(stage_state.get("prUrl"), str):
+            pr_url = stage_state["prUrl"]
+        if not deploy_url and isinstance(stage_state.get("deployUrl"), str):
+            deploy_url = stage_state["deployUrl"]
+
+    return issue_url, pr_url, deploy_url
+
+
+def set_context(
+    state: dict[str, Any], issue_url: str | None, pr_url: str | None, deploy_url: str | None
+) -> None:
+    context = {"updatedAt": utc_now()}
+    if issue_url:
+        context["issueUrl"] = issue_url
+    if pr_url:
+        context["prUrl"] = pr_url
+    if deploy_url:
+        context["deployUrl"] = deploy_url
+    state["context"] = context
+
+
+def reset_stages_from(state: dict[str, Any], pipeline_ids: list[str], from_stage: str) -> None:
+    stages = state.setdefault("stages", {})
+    if not isinstance(stages, dict):
+        state["stages"] = {}
+        stages = state["stages"]
+
+    if from_stage in pipeline_ids:
+        start_index = pipeline_ids.index(from_stage)
+        for stage_id in pipeline_ids[start_index:]:
+            stages.pop(stage_id, None)
+
+    total_attempts = 0
+    for stage_state in stages.values():
+        if isinstance(stage_state, dict) and isinstance(stage_state.get("attempts"), int):
+            total_attempts += stage_state["attempts"]
+    state["attempts"] = {"total": total_attempts}
+
+
+def prepare_state(
+    state: dict[str, Any],
+    pipeline_ids: list[str],
+    issue_url: str | None,
+    pr_url: str | None,
+    from_stage: str,
+) -> tuple[dict[str, Any], str | None, str | None, str | None]:
+    stored_issue_url, stored_pr_url, _ = extract_context_from_state(state, pipeline_ids)
+    if (issue_url and stored_issue_url and issue_url != stored_issue_url) or (
+        pr_url and stored_pr_url and pr_url != stored_pr_url
+    ):
+        state = new_state()
+
+    reset_stages_from(state, pipeline_ids, from_stage)
+    stored_issue_url, stored_pr_url, stored_deploy_url = extract_context_from_state(state, pipeline_ids)
+    issue_url = issue_url or stored_issue_url
+    pr_url = pr_url or stored_pr_url
+    deploy_url = stored_deploy_url
+    set_context(state, issue_url, pr_url, deploy_url)
+    return state, issue_url, pr_url, deploy_url
+
+
 def load_state(path: Path) -> dict[str, Any]:
     if not path.exists():
-        return {"createdAt": utc_now(), "stages": {}, "attempts": {"total": 0}}
-    return json.loads(path.read_text(encoding="utf-8"))
+        return new_state()
+    loaded = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(loaded, dict):
+        raise ValueError(f"Expected JSON object in {path}")
+    loaded.setdefault("stages", {})
+    loaded.setdefault("attempts", {"total": 0})
+    loaded.setdefault("context", {})
+    return loaded
 
 
 def save_state(path: Path, state: dict[str, Any]) -> None:
@@ -282,12 +371,15 @@ def main() -> int:
     pipeline_ids = load_pipeline(skill_dir)
     repo_slug = detect_remote_slug(repo_root)
     state_path = (repo_root / args.state_file).resolve()
-    state = load_state(state_path)
+    state, issue_url, pr_url, deploy_url = prepare_state(
+        load_state(state_path),
+        pipeline_ids,
+        args.issue_url,
+        args.pr_url,
+        args.from_stage,
+    )
 
     failure_patterns = [re.compile(pattern) for pattern in args.failure_pattern]
-    issue_url = args.issue_url
-    pr_url = args.pr_url
-    deploy_url = None
 
     started = False
     for stage_id in pipeline_ids:
@@ -329,6 +421,7 @@ def main() -> int:
                 stage_state["status"] = "failed"
                 stage_state["failure"] = failure_match or f"returncode={returncode}"
                 state["stages"][stage_id] = stage_state
+                set_context(state, issue_url, pr_url, deploy_url)
                 save_state(state_path, state)
                 if attempts >= args.max_stage_attempts:
                     sys.stderr.write(
@@ -359,6 +452,7 @@ def main() -> int:
             if deploy_url:
                 stage_state["deployUrl"] = deploy_url
             state["stages"][stage_id] = stage_state
+            set_context(state, issue_url, pr_url, deploy_url)
             save_state(state_path, state)
             break
 
