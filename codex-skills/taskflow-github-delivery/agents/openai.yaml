@@ -1,4 +1,4 @@
 interface:
-  display_name: "TaskFlow GitHub Delivery"
-  short_description: "Triage TaskFlow tasks and sync GitHub delivery."
-  default_prompt: "Triage the TaskFlow task, decide whether it is already implemented or needs work, create or update the matching GitHub issue, implement the change if needed, and sync an [AIからのメッセージ] comment with issue and PR details back to TaskFlow."
+  display_name: "TaskFlow Delivery Orchestrator"
+  short_description: "Route issue, review, and deploy work across agents"
+  default_prompt: "Use $taskflow-github-delivery to hand work from issue-to-code to pr-review to merge-deploy."

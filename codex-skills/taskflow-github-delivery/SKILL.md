@@ -11,6 +11,19 @@ Use this skill to run the delivery loop between TaskFlow and GitHub for this rep
 Treat TaskFlow as the runtime backlog and GitHub as the source of truth for code review,
 merge history, and release state.
 
+## Agent Folders
+
+Single-function agent folders live under
+`/Users/hgs/devel/project_manager/taskflow/codex-skills/taskflow-github-delivery/agents/`.
+
+- `issue-to-code`: triage a scoped Issue, implement the change, verify it, and open the PR
+- `pr-review`: review the PR for bugs, regressions, and missing verification before merge
+- `merge-deploy`: merge an accepted PR and confirm the resulting `main` and deploy state
+
+Use `agents/pipeline.yaml` as the handoff contract between those folders.
+Keep each folder single-purpose; do not fold review or merge responsibilities back into
+`issue-to-code`.
+
 ## Workflow
 
 1. Build context first.
