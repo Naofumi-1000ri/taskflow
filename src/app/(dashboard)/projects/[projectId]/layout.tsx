@@ -66,7 +66,7 @@ export default function ProjectLayout({
         {/* Header Image or Colored Banner */}
         <div
           data-testid="project-header-banner"
-          className="relative aspect-[5/1] w-full overflow-hidden rounded-lg"
+          className="relative aspect-[5/1] max-h-[240px] w-full overflow-hidden rounded-lg sm:max-h-[260px]"
           style={{
             backgroundColor: project.headerImageUrl ? undefined : `${project.color}30`,
           }}
