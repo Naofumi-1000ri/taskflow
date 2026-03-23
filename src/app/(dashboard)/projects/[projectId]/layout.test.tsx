@@ -51,7 +51,7 @@ const project: Project = {
 };
 
 describe('ProjectLayout', () => {
-  it('renders the project header banner with the same 5:1 aspect ratio used in the cropper', () => {
+  it('renders the project header banner with a bounded max height for wide screens', () => {
     mockedUseProject.mockReturnValue({
       project,
       isLoading: false,
@@ -64,10 +64,12 @@ describe('ProjectLayout', () => {
     );
 
     expect(screen.getByTestId('project-header-banner')).toHaveClass('aspect-[5/1]');
+    expect(screen.getByTestId('project-header-banner')).toHaveClass('max-h-[240px]');
+    expect(screen.getByTestId('project-header-banner')).toHaveClass('sm:max-h-[260px]');
     expect(screen.getByAltText('TaskFlow header')).toBeInTheDocument();
   });
 
-  it('keeps the same banner ratio when no header image is configured', () => {
+  it('keeps the same bounded header sizing when no header image is configured', () => {
     mockedUseProject.mockReturnValue({
       project: {
         ...project,
@@ -83,6 +85,8 @@ describe('ProjectLayout', () => {
     );
 
     expect(screen.getByTestId('project-header-banner')).toHaveClass('aspect-[5/1]');
+    expect(screen.getByTestId('project-header-banner')).toHaveClass('max-h-[240px]');
+    expect(screen.getByTestId('project-header-banner')).toHaveClass('sm:max-h-[260px]');
     expect(screen.queryByAltText('TaskFlow header')).not.toBeInTheDocument();
   });
 });
