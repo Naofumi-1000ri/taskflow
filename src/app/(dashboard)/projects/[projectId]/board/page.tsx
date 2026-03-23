@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { BoardView } from '@/components/board/BoardView';
 import { BoardFilterBar, type BoardFilters } from '@/components/board/BoardFilterBar';
 import { ProjectUrlsBar } from '@/components/board/ProjectUrlsBar';
@@ -13,12 +13,15 @@ import type { ProjectUrl } from '@/types';
 
 export default function BoardPage() {
   const params = useParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const projectId = params.projectId as string;
   const { user } = useAuthStore();
   const { lists, tasks, labels, editTask, removeTask, duplicateTask } = useBoard(projectId);
   const { project, update: updateProject } = useProject(projectId);
+  const selectedTaskId = searchParams.get('task');
 
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [filters, setFilters] = useState<BoardFilters>({
     keyword: '',
     labelIds: new Set(),
@@ -30,38 +33,55 @@ export default function BoardPage() {
     ? tasks.find((t) => t.id === selectedTaskId) || null
     : null;
 
+  const syncTaskQuery = useCallback(
+    (taskId: string | null) => {
+      const nextParams = new URLSearchParams(searchParams.toString());
+
+      if (taskId) {
+        nextParams.set('task', taskId);
+      } else {
+        nextParams.delete('task');
+      }
+
+      const nextQuery = nextParams.toString();
+      const nextUrl = nextQuery ? `${pathname}?${nextQuery}` : pathname;
+      router.replace(nextUrl, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
+
   const handleTaskClick = useCallback((taskId: string) => {
-    setSelectedTaskId(taskId);
-  }, []);
+    syncTaskQuery(taskId);
+  }, [syncTaskQuery]);
 
   const handleCloseModal = useCallback(() => {
-    setSelectedTaskId(null);
-  }, []);
+    syncTaskQuery(null);
+  }, [syncTaskQuery]);
 
   const handleUpdateTask = useCallback(
     (data: Parameters<typeof editTask>[1]) => {
-      if (selectedTaskId) {
-        editTask(selectedTaskId, data);
+      if (selectedTask) {
+        editTask(selectedTask.id, data);
       }
     },
-    [selectedTaskId, editTask]
+    [selectedTask, editTask]
   );
 
   const handleDeleteTask = useCallback(() => {
-    if (selectedTaskId) {
-      removeTask(selectedTaskId);
-      setSelectedTaskId(null);
+    if (selectedTask) {
+      removeTask(selectedTask.id);
+      syncTaskQuery(null);
     }
-  }, [selectedTaskId, removeTask]);
+  }, [selectedTask, removeTask, syncTaskQuery]);
 
   const handleDuplicateTask = useCallback(async () => {
-    if (selectedTaskId && user) {
-      const newTaskId = await duplicateTask(selectedTaskId, user.id);
+    if (selectedTask && user) {
+      const newTaskId = await duplicateTask(selectedTask.id, user.id);
       if (newTaskId) {
-        setSelectedTaskId(newTaskId); // Open the new task
+        syncTaskQuery(newTaskId);
       }
     }
-  }, [selectedTaskId, user, duplicateTask]);
+  }, [selectedTask, user, duplicateTask, syncTaskQuery]);
 
   // URL handlers
   const handleAddUrl = useCallback(
@@ -118,7 +138,7 @@ export default function BoardPage() {
         lists={lists}
         labels={labels}
         allTasks={tasks}
-        isOpen={!!selectedTaskId}
+        isOpen={!!selectedTask}
         onClose={handleCloseModal}
         onUpdate={handleUpdateTask}
         onDelete={handleDeleteTask}
