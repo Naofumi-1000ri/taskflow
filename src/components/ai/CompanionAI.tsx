@@ -83,10 +83,105 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
   const [showToolConfirm, setShowToolConfirm] = useState(false);
   const [pendingTools, setPendingTools] = useState<ToolCall[] | null>(null);
   const [projectAccessError, setProjectAccessError] = useState<string | null>(null);
+  const [panelPosition, setPanelPosition] = useState<{ x: number; y: number } | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const stored = localStorage.getItem('companionAIPanelPosition');
+      return stored ? (JSON.parse(stored) as { x: number; y: number }) : null;
+    } catch {
+      return null;
+    }
+  });
 
   const panelRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const projectAccessRequestedRef = useRef(false);
+  const dragStateRef = useRef<{
+    startClientX: number;
+    startClientY: number;
+    startPosX: number;
+    startPosY: number;
+  } | null>(null);
+  const latestPositionRef = useRef<{ x: number; y: number } | null>(panelPosition);
+
+  const handlePanelDragStart = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('button, input, textarea, a')) return;
+    if (!panelRef.current) return;
+    const rect = panelRef.current.getBoundingClientRect();
+    dragStateRef.current = {
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startPosX: rect.left,
+      startPosY: rect.top,
+    };
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  }, []);
+
+  useEffect(() => {
+    const clamp = (x: number, y: number) => {
+      const w = panelRef.current?.offsetWidth ?? 420;
+      const h = panelRef.current?.offsetHeight ?? 600;
+      const maxX = Math.max(0, window.innerWidth - w);
+      const maxY = Math.max(0, window.innerHeight - h);
+      return {
+        x: Math.min(Math.max(0, x), maxX),
+        y: Math.min(Math.max(0, y), maxY),
+      };
+    };
+
+    const onMouseMove = (event: MouseEvent) => {
+      if (!dragStateRef.current) return;
+      const { startClientX, startClientY, startPosX, startPosY } = dragStateRef.current;
+      const next = clamp(
+        startPosX + (event.clientX - startClientX),
+        startPosY + (event.clientY - startClientY)
+      );
+      latestPositionRef.current = next;
+      setPanelPosition(next);
+    };
+
+    const finishDrag = () => {
+      if (!dragStateRef.current) return;
+      dragStateRef.current = null;
+      document.body.style.userSelect = '';
+      const finalPos = latestPositionRef.current;
+      if (finalPos) {
+        try {
+          localStorage.setItem('companionAIPanelPosition', JSON.stringify(finalPos));
+        } catch {
+          // localStorage may be unavailable (private mode, quota); ignore
+        }
+      }
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', finishDrag);
+    window.addEventListener('blur', finishDrag);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', finishDrag);
+      window.removeEventListener('blur', finishDrag);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => {
+      setPanelPosition((prev) => {
+        if (!prev) return prev;
+        const w = panelRef.current?.offsetWidth ?? 420;
+        const h = panelRef.current?.offsetHeight ?? 600;
+        const maxX = Math.max(0, window.innerWidth - w);
+        const maxY = Math.max(0, window.innerHeight - h);
+        const x = Math.min(Math.max(0, prev.x), maxX);
+        const y = Math.min(Math.max(0, prev.y), maxY);
+        if (x === prev.x && y === prev.y) return prev;
+        return { x, y };
+      });
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     projectAccessRequestedRef.current = false;
@@ -531,10 +626,21 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
       {isOpen && (
         <div
           ref={panelRef}
-          className="fixed bottom-24 right-6 z-50 flex h-[600px] w-[420px] flex-col overflow-hidden rounded-lg border bg-background shadow-xl"
+          className={cn(
+            'fixed z-50 flex h-[600px] w-[420px] flex-col overflow-hidden rounded-lg border bg-background shadow-xl',
+            !panelPosition && 'bottom-24 right-6'
+          )}
+          style={
+            panelPosition
+              ? { left: panelPosition.x, top: panelPosition.y }
+              : undefined
+          }
         >
-          {/* Header */}
-          <div className="flex items-center justify-between border-b px-4 py-3">
+          {/* Header (drag handle) */}
+          <div
+            className="flex cursor-move select-none items-center justify-between border-b px-4 py-3"
+            onMouseDown={handlePanelDragStart}
+          >
             <div className="flex items-center gap-2 min-w-0">
               <MessageCircle className="h-5 w-5 shrink-0" />
               <span className="truncate font-medium">
