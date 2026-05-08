@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "node ./scripts/run-next-build.mjs",
     "start": "next start",
-    "audit": "npm audit --omit=optional --audit-level=high",
+    "audit": "npm audit --omit=optional",
     "deps:report": "node ./scripts/dependency-health-report.mjs",
     "lint": "eslint src e2e scripts playwright.config.ts eslint.config.mjs next.config.ts",
     "test": "vitest",
@@ -81,6 +81,7 @@
   },
   "overrides": {
     "@tootallnate/once": "3.0.1",
-    "postcss": "^8.5.12"
+    "postcss": "^8.5.12",
+    "uuid": "^14.0.0"
   }
 }
