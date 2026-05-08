@@ -492,7 +492,7 @@ export function BoardView({ projectId, onTaskClick, filters }: BoardViewProps) {
           ) : (
             <Button
               variant="outline"
-              className="h-auto w-full justify-start border-dashed py-6"
+              className="h-auto w-full self-start justify-start border-dashed py-3"
               onClick={() => setIsAddingList(true)}
             >
               <Plus className="mr-2 h-4 w-4" />
