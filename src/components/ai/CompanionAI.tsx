@@ -102,6 +102,7 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
     startPosX: number;
     startPosY: number;
   } | null>(null);
+  const latestPositionRef = useRef<{ x: number; y: number } | null>(panelPosition);
 
   const handlePanelDragStart = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('button, input, textarea, a')) return;
@@ -113,6 +114,7 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
       startPosX: rect.left,
       startPosY: rect.top,
     };
+    document.body.style.userSelect = 'none';
     e.preventDefault();
   }, []);
 
@@ -135,27 +137,33 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
         startPosX + (event.clientX - startClientX),
         startPosY + (event.clientY - startClientY)
       );
+      latestPositionRef.current = next;
       setPanelPosition(next);
     };
 
-    const onMouseUp = () => {
+    const finishDrag = () => {
+      if (!dragStateRef.current) return;
       dragStateRef.current = null;
+      document.body.style.userSelect = '';
+      const finalPos = latestPositionRef.current;
+      if (finalPos) {
+        try {
+          localStorage.setItem('companionAIPanelPosition', JSON.stringify(finalPos));
+        } catch {
+          // localStorage may be unavailable (private mode, quota); ignore
+        }
+      }
     };
 
     window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('mouseup', finishDrag);
+    window.addEventListener('blur', finishDrag);
     return () => {
       window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('mouseup', finishDrag);
+      window.removeEventListener('blur', finishDrag);
     };
   }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (panelPosition) {
-      localStorage.setItem('companionAIPanelPosition', JSON.stringify(panelPosition));
-    }
-  }, [panelPosition]);
 
   useEffect(() => {
     const onResize = () => {
