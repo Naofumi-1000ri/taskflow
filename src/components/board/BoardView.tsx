@@ -440,7 +440,7 @@ export function BoardView({ projectId, onTaskClick, filters }: BoardViewProps) {
           </SortableContext>
 
           {/* Add List */}
-          <div className="flex w-72 flex-shrink-0">
+          <div className="flex w-72 flex-shrink-0 self-start">
           {isAddingList ? (
             <div className="w-full rounded-lg bg-gray-100 p-3">
               <Input
