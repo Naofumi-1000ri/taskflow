@@ -141,10 +141,16 @@ service cloud.firestore {
       allow update, delete: if isAllowedUser() && resource.data.userId == request.auth.uid;
     }
 
-    // ユーザーメモ - 本人のみ
+    // ユーザーメモ - 本人のみ。
+    // memoId は uid なので、ドキュメント未作成時でも権限判定できるよう
+    // memoId == request.auth.uid を主条件にし、誤って他ユーザーの memo を
+    // 上書きできないよう resource.data.userId も補助的に検証する。
     match /userMemos/{memoId} {
-      allow read, write: if isAllowedUser() && resource.data.userId == request.auth.uid;
-      allow create: if isAllowedUser();
+      allow read: if isAllowedUser() && memoId == request.auth.uid;
+      allow create: if isAllowedUser() && memoId == request.auth.uid &&
+                       request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAllowedUser() && memoId == request.auth.uid &&
+                               resource.data.userId == request.auth.uid;
     }
   }
 }
