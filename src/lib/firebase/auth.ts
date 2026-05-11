@@ -29,9 +29,20 @@ export const TEST_USER = {
   displayName: 'テストユーザー',
 } as const;
 
+// Demo user credentials (production demo button — credentials are public by design)
+export const DEMO_USER_EMAIL =
+  process.env.NEXT_PUBLIC_DEMO_EMAIL ?? 'demo@1000ri.jp';
+const DEMO_USER_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? '';
+export const DEMO_USER_DISPLAY_NAME = 'デモユーザー';
+
 // Check if test mode is enabled (only on localhost)
 export function isTestMode(): boolean {
   return isFirebaseTestAuthEnabled();
+}
+
+// Demo login is available whenever the demo password env var is configured.
+export function isDemoLoginEnabled(): boolean {
+  return DEMO_USER_PASSWORD.length > 0;
 }
 
 /**
@@ -92,6 +103,52 @@ export async function signInWithTestUser(): Promise<User> {
       } catch (createError: unknown) {
         // If user already exists with different password, or other error
         console.error('Failed to create test user:', createError);
+        throw createError;
+      }
+    }
+    throw error;
+  }
+}
+
+/**
+ * Sign in with the shared demo user (always available in production).
+ * Auto-creates the Firebase Auth record on first use so the button never dead-ends,
+ * but production setup should run `npm run seed:demo` to populate sample data.
+ */
+export async function signInWithDemoUser(): Promise<User> {
+  if (!isDemoLoginEnabled()) {
+    throw new Error(
+      'デモログインは現在利用できません。NEXT_PUBLIC_DEMO_PASSWORD が設定されていません。'
+    );
+  }
+
+  const auth = getFirebaseAuth();
+
+  try {
+    const result = await signInWithEmailAndPassword(
+      auth,
+      DEMO_USER_EMAIL,
+      DEMO_USER_PASSWORD
+    );
+    await createOrUpdateUser(result.user);
+    return result.user;
+  } catch (error: unknown) {
+    const errorCode =
+      error && typeof error === 'object' && 'code' in error ? error.code : null;
+    if (
+      errorCode === 'auth/user-not-found' ||
+      errorCode === 'auth/invalid-credential'
+    ) {
+      try {
+        const result = await createUserWithEmailAndPassword(
+          auth,
+          DEMO_USER_EMAIL,
+          DEMO_USER_PASSWORD
+        );
+        await createOrUpdateUser(result.user);
+        return result.user;
+      } catch (createError: unknown) {
+        console.error('Failed to create demo user:', createError);
         throw createError;
       }
     }

@@ -5,8 +5,10 @@ import { useAuthStore } from '@/stores/authStore';
 import {
   signInWithGoogle,
   signInWithTestUser,
+  signInWithDemoUser,
   signOut as firebaseSignOut,
   isTestMode,
+  isDemoLoginEnabled,
   getUserData,
 } from '@/lib/firebase/auth';
 import { isE2EMockAuthEnabled } from '@/lib/firebase/testMode';
@@ -56,6 +58,22 @@ export function useAuth() {
     }
   }, [setLoading, setFirebaseUser, setUser]);
 
+  // Sign in with the shared demo user (production demo button)
+  const signInAsDemoUser = useCallback(async () => {
+    try {
+      setLoading(true);
+      const fbUser = await signInWithDemoUser();
+      setFirebaseUser(fbUser);
+      const userData = await getUserData(fbUser.uid);
+      setUser(userData);
+    } catch (error) {
+      console.error('Demo sign in error:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [setLoading, setFirebaseUser, setUser]);
+
   // Sign out
   const signOut = useCallback(async () => {
     try {
@@ -80,8 +98,10 @@ export function useAuth() {
     isLoading,
     isAuthenticated,
     isTestMode: isTestMode(),
+    isDemoLoginEnabled: isDemoLoginEnabled(),
     signIn,
     signInAsTestUser,
+    signInAsDemoUser,
     signOut,
   };
 }

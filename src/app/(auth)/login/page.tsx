@@ -6,11 +6,19 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, FlaskConical } from 'lucide-react';
+import { Loader2, FlaskConical, Sparkles } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading, isTestMode, signIn, signInAsTestUser } = useAuth();
+  const {
+    isAuthenticated,
+    isLoading,
+    isTestMode,
+    isDemoLoginEnabled,
+    signIn,
+    signInAsTestUser,
+    signInAsDemoUser,
+  } = useAuth();
 
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
@@ -33,6 +41,15 @@ export default function LoginPage() {
       router.push('/');
     } catch (error) {
       console.error('Test login failed:', error);
+    }
+  };
+
+  const handleDemoSignIn = async () => {
+    try {
+      await signInAsDemoUser();
+      router.push('/');
+    } catch (error) {
+      console.error('Demo login failed:', error);
     }
   };
 
@@ -83,6 +100,34 @@ export default function LoginPage() {
             </svg>
             Googleでログイン
           </Button>
+
+          {isDemoLoginEnabled && (
+            <>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <Separator className="w-full" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    または
+                  </span>
+                </div>
+              </div>
+              <Button
+                onClick={handleDemoSignIn}
+                variant="secondary"
+                className="w-full"
+                size="lg"
+                data-testid="demo-login"
+              >
+                <Sparkles className="mr-2 h-5 w-5" />
+                デモを試す（ログイン不要）
+              </Button>
+              <p className="text-center text-xs text-muted-foreground">
+                サンプルプロジェクトで機能を体験できます
+              </p>
+            </>
+          )}
 
           {isTestMode && (
             <>

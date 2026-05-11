@@ -8,6 +8,7 @@
     "start": "next start",
     "audit": "npm audit --omit=optional --audit-level=high",
     "deps:report": "node ./scripts/dependency-health-report.mjs",
+    "seed:demo": "node --env-file-if-exists=.env.local ./scripts/seed-demo.mjs",
     "lint": "eslint src e2e scripts playwright.config.ts eslint.config.mjs next.config.ts",
     "test": "vitest",
     "test:run": "vitest run",
