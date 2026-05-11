@@ -12,6 +12,10 @@ const baseEnv = {
     process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? '1234567890',
   NEXT_PUBLIC_FIREBASE_APP_ID:
     process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? '1:1234567890:web:abcdef123456',
+  NEXT_PUBLIC_DEMO_EMAIL:
+    process.env.NEXT_PUBLIC_DEMO_EMAIL ?? 'demo@1000ri.jp',
+  NEXT_PUBLIC_DEMO_PASSWORD:
+    process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? 'smoke-demo-password',
   NEXT_TELEMETRY_DISABLED: process.env.NEXT_TELEMETRY_DISABLED ?? '1',
 };
 
@@ -50,6 +54,11 @@ function runPlaywright(specPath, envOverrides) {
 
 async function main() {
   await runPlaywright('e2e/auth-smoke.spec.ts', {
+    NEXT_PUBLIC_ENABLE_TEST_AUTH: 'false',
+    NEXT_PUBLIC_E2E_MOCK_AUTH: 'false',
+  });
+
+  await runPlaywright('e2e/demo-login.spec.ts', {
     NEXT_PUBLIC_ENABLE_TEST_AUTH: 'false',
     NEXT_PUBLIC_E2E_MOCK_AUTH: 'false',
   });
