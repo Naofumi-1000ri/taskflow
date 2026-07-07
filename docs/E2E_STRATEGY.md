@@ -48,6 +48,23 @@ Use it for flows like:
 - task editing
 - calendar and gantt behavior
 
+## Local Full-Suite Caveats (2026-07-07 時点)
+
+素の `npm run test:e2e`（実 Firebase 環境）でフルスイートを回すときの既知の注意点:
+
+- **テストユーザーは Firestore 権限がない**: `test-login` のユーザーではプロジェクトの購読・作成が
+  `Missing or insufficient permissions` で失敗する。`createProject` ヘルパーに依存するテスト
+  （calendar.spec など）はこの環境では失敗し、project.spec は自動スキップする。
+  プロジェクトデータが必要なテストは **デモログイン（`data-testid="demo-login"`、シード済み
+  プロジェクトあり）** を使うこと（例: `e2e/ai-tool-confirm.spec.ts`）。
+- **スモーク3本（auth-smoke / authenticated-smoke / demo-login）は素の実行では失敗する設計**:
+  これらは `npm run test:e2e:smoke`（`scripts/run-playwright-smoke.mjs`）が注入する
+  ダミー Firebase 設定・環境フラグが前提。フルスイートでの失敗は想定内で、判定はスモークランナー側で行う。
+- **開発ビルドの React Query Devtools ボタンが右下の相棒AIトグルに重なる**: クリックが
+  intercept されるので、テスト側で `.tsqd-parent-container { display: none !important; }` を注入する。
+- **AI チャットのテスト**: `/api/ai/chat`（SSE）と `/api/ai/settings` を `page.route` でモックし、
+  `ai-settings-storage` の localStorage を `addInitScript` で注入すればプロバイダ設定済み状態を再現できる。
+
 ## Expansion Plan
 
 Near-term target:

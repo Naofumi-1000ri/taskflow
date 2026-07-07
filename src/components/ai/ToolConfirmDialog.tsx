@@ -95,6 +95,7 @@ export function ToolConfirmDialog({
             {descriptions.map((desc, index) => (
               <li
                 key={index}
+                data-testid="tool-confirm-item"
                 className="flex items-start gap-2 rounded-md border bg-muted/30 p-3 text-sm"
               >
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
@@ -109,12 +110,14 @@ export function ToolConfirmDialog({
             variant="outline"
             onClick={onCancel}
             disabled={isExecuting}
+            data-testid="tool-confirm-cancel"
           >
             キャンセル
           </Button>
           <Button
             onClick={onConfirm}
             disabled={isExecuting}
+            data-testid="tool-confirm-execute"
           >
             {isExecuting ? (
               <>

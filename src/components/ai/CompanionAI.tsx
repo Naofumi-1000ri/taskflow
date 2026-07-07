@@ -485,9 +485,12 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
   const handleToolConfirm = useCallback(async () => {
     if (!pendingTools) return;
 
+    const tools = pendingTools;
     setShowToolConfirm(false);
-    await confirmToolExecution(pendingTools);
+    // 実行中にAIが次の確認を要求すると pendingTools が再セットされるため、
+    // await 後にクリアすると新しい確認内容を上書きしてしまう。必ず実行前にクリアする。
     setPendingTools(null);
+    await confirmToolExecution(tools);
   }, [pendingTools, confirmToolExecution]);
 
   // Handle tool cancellation
@@ -597,6 +600,7 @@ export function CompanionAI({ projectId }: CompanionAIProps) {
     <>
       {/* Floating Button */}
       <button
+        data-testid="companion-ai-toggle"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
           'fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-all hover:scale-105',

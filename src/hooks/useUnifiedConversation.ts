@@ -416,6 +416,9 @@ export function useUnifiedConversation({
     if (!currentConversationId) return;
 
     setIsLoading(true);
+    // finally でクリアすると、processToolCalls の連鎖中に発生した次の確認要求
+    // （pendingToolCallsRef への再セット）を上書きしてしまうため、実行開始時にクリアする
+    pendingToolCallsRef.current = null;
     try {
       await processToolCalls(toolCalls, messages, currentConversationId);
     } catch (err) {
@@ -423,7 +426,6 @@ export function useUnifiedConversation({
       setError(errorMessage);
     } finally {
       setIsLoading(false);
-      pendingToolCallsRef.current = null;
     }
   }, [currentConversationId, messages, processToolCalls]);
 
