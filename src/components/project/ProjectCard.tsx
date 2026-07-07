@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { MoreHorizontal, Users, Archive, Trash2, Settings } from 'lucide-react';
+import { MoreHorizontal, Users, Archive, ArchiveRestore, Trash2, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +20,7 @@ interface ProjectCardProps {
   project: Project;
   taskCount?: number;
   onArchive?: (projectId: string) => void;
+  onRestore?: (projectId: string) => void;
   onDelete?: (projectId: string) => void;
 }
 
@@ -27,6 +28,7 @@ export function ProjectCard({
   project,
   taskCount = 0,
   onArchive,
+  onRestore,
   onDelete,
 }: ProjectCardProps) {
   return (
@@ -88,10 +90,17 @@ export function ProjectCard({
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onArchive?.(project.id)}>
-              <Archive className="mr-2 h-4 w-4" />
-              アーカイブ
-            </DropdownMenuItem>
+            {project.isArchived ? (
+              <DropdownMenuItem onClick={() => onRestore?.(project.id)}>
+                <ArchiveRestore className="mr-2 h-4 w-4" />
+                復元
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={() => onArchive?.(project.id)}>
+                <Archive className="mr-2 h-4 w-4" />
+                アーカイブ
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               onClick={() => onDelete?.(project.id)}
               className="text-red-600"

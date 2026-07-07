@@ -73,6 +73,58 @@ test.describe('Project Management', () => {
     await expect(page).toHaveURL(/\/projects\/.*\/board/, { timeout: 30000 });
   });
 
+  test('should archive and restore a project', async ({ page }) => {
+    await page.goto('/projects');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.getByRole('button', { name: '新規プロジェクト' })).toBeVisible({ timeout: 60000 });
+    await page.waitForTimeout(3000);
+
+    const projectCards = page.locator('main [data-testid="project-card"]');
+    const count = await projectCards.count();
+
+    if (count === 0) {
+      console.log('No accessible projects found - skipping archive test');
+      test.skip();
+      return;
+    }
+
+    // Remember the name of the project we archive
+    const firstCard = projectCards.first();
+    const projectName = (await firstCard.locator('h3').innerText()).trim();
+
+    // Accept the confirm() dialog for archiving
+    page.once('dialog', (dialog) => dialog.accept());
+
+    // Open the card's dropdown menu and click アーカイブ
+    await firstCard.hover();
+    await firstCard.getByRole('button').click();
+    await page.getByRole('menuitem', { name: 'アーカイブ' }).click();
+
+    // Archived section toggle should appear
+    const toggle = page.getByTestId('toggle-archived-projects');
+    await expect(toggle).toBeVisible({ timeout: 30000 });
+
+    // Expand archived section and verify the project is there
+    await toggle.click();
+    const archivedSection = page.getByTestId('archived-projects-section');
+    await expect(archivedSection.getByText(projectName)).toBeVisible({ timeout: 30000 });
+
+    // Restore the project
+    const archivedCard = archivedSection
+      .locator('[data-testid="project-card"]')
+      .filter({ hasText: projectName })
+      .first();
+    await archivedCard.hover();
+    await archivedCard.getByRole('button').click();
+    await page.getByRole('menuitem', { name: '復元' }).click();
+
+    // The project should be back in the active list
+    await expect(
+      page.locator('main [data-testid="project-card"]').filter({ hasText: projectName }).first()
+    ).toBeVisible({ timeout: 30000 });
+  });
+
   test('should navigate to project settings', async ({ page }) => {
     await page.goto('/projects');
     await page.waitForLoadState('networkidle');

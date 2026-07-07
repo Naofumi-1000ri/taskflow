@@ -245,6 +245,35 @@ export function subscribeToUserProjects(
   );
 }
 
+export function subscribeToArchivedUserProjects(
+  userId: string,
+  callback: (projects: Project[]) => void,
+  onError?: (error: Error) => void
+): () => void {
+  const db = getFirebaseDb();
+  const q = query(
+    collection(db, 'projects'),
+    where('memberIds', 'array-contains', userId),
+    where('isArchived', '==', true)
+  );
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const projects = snapshot.docs
+        .map((doc) => convertDoc<Project>(doc.data(), doc.id))
+        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+      callback(projects);
+    },
+    (error) => {
+      console.error('[Firestore] subscribeToArchivedUserProjects error:', error);
+      if (onError) {
+        onError(error);
+      }
+    }
+  );
+}
+
 export async function updateProjectOrder(projectId: string, order: number): Promise<void> {
   const db = getFirebaseDb();
   await updateDoc(doc(db, 'projects', projectId), {
