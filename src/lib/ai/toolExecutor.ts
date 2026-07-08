@@ -84,6 +84,14 @@ export function requiresConfirmation(toolCalls: ToolCall[]): boolean {
   return toolCalls.some((call) => TOOLS_REQUIRING_CONFIRMATION.includes(call.name));
 }
 
+// taskTitle が引数に含まれていれば「タイトル」、なければ ID 末尾で対象を識別できるようにする
+function taskLabel(args: unknown): string {
+  const { taskTitle, taskId } = (args ?? {}) as { taskTitle?: string; taskId?: string };
+  if (taskTitle) return `「${taskTitle}」`;
+  if (taskId) return `（ID: ${taskId}）`;
+  return '';
+}
+
 /**
  * Get human-readable description of tool calls for confirmation dialog
  */
@@ -118,24 +126,30 @@ export function getToolCallsDescription(toolCalls: ToolCall[]): string[] {
         if (args.priority) updates.push(`優先度→${args.priority}`);
         if (args.dueDate) updates.push(`期限→${args.dueDate}`);
         if (args.isCompleted !== undefined) updates.push(args.isCompleted ? '完了にする' : '未完了に戻す');
-        return `タスクを更新: ${updates.join(', ')}`;
+        return `タスク${taskLabel(call.arguments)}を更新: ${updates.join(', ')}`;
       }
       case 'delete_task': {
-        return `タスクを削除`;
+        return `タスク${taskLabel(call.arguments)}を削除`;
       }
       case 'complete_task': {
         const args = call.arguments as { taskId: string; isCompleted: boolean };
-        return args.isCompleted ? 'タスクを完了にする' : 'タスクを未完了に戻す';
+        const label = taskLabel(call.arguments);
+        return args.isCompleted ? `タスク${label}を完了にする` : `タスク${label}を未完了に戻す`;
       }
       case 'move_task': {
-        return `タスクを別のリストに移動`;
+        const args = call.arguments as { listName?: string };
+        const label = taskLabel(call.arguments);
+        return args.listName
+          ? `タスク${label}を「${args.listName}」に移動`
+          : `タスク${label}を別のリストに移動`;
       }
       case 'assign_task': {
         const args = call.arguments as { taskId: string; assigneeIds: string[] };
+        const label = taskLabel(call.arguments);
         if (args.assigneeIds.length === 0) {
-          return `タスクの担当者をクリア`;
+          return `タスク${label}の担当者をクリア`;
         }
-        return `タスクに${args.assigneeIds.length}人の担当者を設定`;
+        return `タスク${label}に${args.assigneeIds.length}人の担当者を設定`;
       }
       // Read-only tools (no confirmation needed, but include for completeness)
       case 'get_tasks':

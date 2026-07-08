@@ -37,7 +37,11 @@ async function mockAIChat(page: Page, marker: string) {
         {
           type: 'tool_calls',
           toolCalls: [
-            { id: 'call-1', name: 'delete_task', arguments: { taskId: 'e2e-task-1' } },
+            {
+              id: 'call-1',
+              name: 'delete_task',
+              arguments: { taskId: 'e2e-task-1', taskTitle: 'E2E削除対象タスク1' },
+            },
           ],
         },
       ]);
@@ -48,7 +52,11 @@ async function mockAIChat(page: Page, marker: string) {
         {
           type: 'tool_calls',
           toolCalls: [
-            { id: 'call-2', name: 'delete_task', arguments: { taskId: 'e2e-task-2' } },
+            {
+              id: 'call-2',
+              name: 'delete_task',
+              arguments: { taskId: 'e2e-task-2', taskTitle: 'E2E削除対象タスク2' },
+            },
           ],
         },
       ]);
@@ -113,9 +121,10 @@ test.describe('相棒AI ツール実行確認ダイアログ', () => {
     // --- 1回目の確認ダイアログ ---
     const executeButton = page.locator('[data-testid="tool-confirm-execute"]');
     await expect(executeButton).toBeVisible({ timeout: 15000 });
+    // 削除対象のタスク名が表示される（「タスクを削除」だけの匿名表示にならない）
     await expect(
       page.locator('[data-testid="tool-confirm-item"]').first()
-    ).toBeVisible();
+    ).toContainText('E2E削除対象タスク1');
     await executeButton.click();
 
     // --- 2回目の確認ダイアログ（回帰の本丸） ---
@@ -124,7 +133,7 @@ test.describe('相棒AI ツール実行確認ダイアログ', () => {
     await expect(executeButton).toBeVisible({ timeout: 15000 });
     await expect(
       page.locator('[data-testid="tool-confirm-item"]').first()
-    ).toBeVisible({ timeout: 5000 });
+    ).toContainText('E2E削除対象タスク2', { timeout: 5000 });
     await expect(executeButton).toBeEnabled();
     await executeButton.click();
 

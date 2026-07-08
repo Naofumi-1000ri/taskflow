@@ -16,6 +16,7 @@ import { AITool, ToolHandler } from './types';
 export interface CompleteTaskArgs {
   projectId?: string;
   taskId: string;
+  taskTitle?: string;
   isCompleted: boolean;
 }
 
@@ -40,6 +41,10 @@ export const completeTaskToolDefinition: AITool = {
       taskId: {
         type: 'string',
         description: 'タスクのID（必須）',
+      },
+      taskTitle: {
+        type: 'string',
+        description: '対象タスクのタイトル（確認ダイアログの表示に使うため必ず指定）',
       },
       isCompleted: {
         type: 'boolean',
@@ -85,7 +90,9 @@ export const completeTaskHandler: ToolHandler<CompleteTaskArgs, CompleteTaskResu
 
 export interface MoveTaskArgs {
   taskId: string;
+  taskTitle?: string;
   listId: string;
+  listName?: string;
 }
 
 export interface MoveTaskResult {
@@ -107,12 +114,20 @@ export const moveTaskToolDefinition: AITool = {
         type: 'string',
         description: 'タスクのID（必須）',
       },
+      taskTitle: {
+        type: 'string',
+        description: '対象タスクのタイトル（確認ダイアログの表示に使うため必ず指定）',
+      },
       listId: {
         type: 'string',
         description: '移動先のリストID（必須）',
       },
+      listName: {
+        type: 'string',
+        description: '移動先のリスト名（確認ダイアログの表示に使うため必ず指定）',
+      },
     },
-    required: ['taskId', 'listId'],
+    required: ['taskId', 'taskTitle', 'listId', 'listName'],
   },
 };
 
@@ -156,6 +171,7 @@ export const moveTaskHandler: ToolHandler<MoveTaskArgs, MoveTaskResult> = async 
 
 export interface AssignTaskArgs {
   taskId: string;
+  taskTitle?: string;
   assigneeIds: string[];
 }
 
@@ -176,6 +192,10 @@ export const assignTaskToolDefinition: AITool = {
       taskId: {
         type: 'string',
         description: 'タスクのID（必須）',
+      },
+      taskTitle: {
+        type: 'string',
+        description: '対象タスクのタイトル（確認ダイアログの表示に使うため必ず指定）',
       },
       assigneeIds: {
         type: 'array',

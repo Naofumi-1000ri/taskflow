@@ -4,6 +4,7 @@ import { AITool, ToolHandler } from './types';
 // Delete (archive) task argument types
 export interface DeleteTaskArgs {
   taskId: string;
+  taskTitle?: string;
 }
 
 export interface DeleteTaskResult {
@@ -28,8 +29,12 @@ export const deleteTaskToolDefinition: AITool = {
         type: 'string',
         description: '削除するタスクのID（必須）',
       },
+      taskTitle: {
+        type: 'string',
+        description: '削除するタスクのタイトル（確認ダイアログの表示に使うため必ず指定）',
+      },
     },
-    required: ['taskId'],
+    required: ['taskId', 'taskTitle'],
   },
 };
 
