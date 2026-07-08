@@ -7,6 +7,7 @@ import { recalculateDates } from '@/lib/utils/task';
 export interface UpdateTaskArgs {
   projectId?: string;
   taskId: string;
+  taskTitle?: string;
   title?: string;
   description?: string;
   priority?: 'high' | 'medium' | 'low';
@@ -42,6 +43,10 @@ export const updateTaskToolDefinition: AITool = {
       taskId: {
         type: 'string',
         description: '更新するタスクのID（必須）',
+      },
+      taskTitle: {
+        type: 'string',
+        description: '更新するタスクの現在のタイトル（確認ダイアログの表示に使うため必ず指定）',
       },
       title: {
         type: 'string',
