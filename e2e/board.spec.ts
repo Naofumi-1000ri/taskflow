@@ -209,4 +209,48 @@ test.describe('Board/Kanban', () => {
     await expect(page.locator('text=チェックリストの新規作成')).toBeVisible();
     await expect(page.locator('text=優先度')).toBeVisible();
   });
+
+  test('should toggle auto-set-start-date option in list menu', async ({ page }) => {
+    const projectCards = page.locator('main a[href*="/board"] h3');
+    const count = await projectCards.count();
+
+    if (count === 0) {
+      test.skip();
+      return;
+    }
+
+    const listName = `開始日リスト_${Date.now()}`;
+
+    await projectCards.first().click();
+    await expect(page.locator('text=リストを追加')).toBeVisible({ timeout: 10000 });
+
+    // Create a fresh list
+    await page.click('text=リストを追加');
+    const listInput = page.locator('input[placeholder*="リスト名"]');
+    await listInput.fill(listName);
+    await listInput.locator('..').locator('button:has-text("追加")').click();
+
+    const list = page.locator(`[data-testid="board-list"]:has(h3:has-text("${listName}"))`);
+    await expect(list).toBeVisible({ timeout: 10000 });
+
+    // Open list dropdown menu and toggle the option
+    await list.locator('button:has(svg.lucide-more-horizontal), button:has(svg.lucide-ellipsis)').first().click();
+    const menuItem = page.getByRole('menuitem', { name: 'ここに入ったら開始日を設定' });
+    await expect(menuItem).toBeVisible({ timeout: 5000 });
+    await menuItem.click();
+
+    // Reopen the menu and verify the ON indicator
+    await list.locator('button:has(svg.lucide-more-horizontal), button:has(svg.lucide-ellipsis)').first().click();
+    await expect(
+      page.getByRole('menuitem', { name: /ここに入ったら開始日を設定/ }).locator('text=ON')
+    ).toBeVisible({ timeout: 5000 });
+    await page.keyboard.press('Escape');
+
+    // Create a task in the list — startDate should be set automatically
+    await list.locator('button:has-text("タスクを追加")').first().click();
+    const taskTitle = `開始日タスク_${Date.now()}`;
+    await list.locator('input[placeholder*="タスク"]').fill(taskTitle);
+    await list.locator('button:has-text("追加")').click();
+    await expect(list.locator(`text=${taskTitle}`)).toBeVisible({ timeout: 10000 });
+  });
 });

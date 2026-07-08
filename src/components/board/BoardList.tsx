@@ -8,7 +8,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useDroppable } from '@dnd-kit/core';
-import { MoreHorizontal, Plus, Trash2, Palette, GripVertical, CheckCircle2, CircleOff } from 'lucide-react';
+import { MoreHorizontal, Plus, Trash2, Palette, GripVertical, CheckCircle2, CircleOff, CalendarPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -41,7 +41,7 @@ interface BoardListProps {
   labels: Label[];
   tags: Tag[];
   onAddTask: (title: string, position: 'top' | 'bottom') => void;
-  onEditList: (data: { name?: string; color?: string; autoCompleteOnEnter?: boolean; autoUncompleteOnExit?: boolean }) => void;
+  onEditList: (data: { name?: string; color?: string; autoCompleteOnEnter?: boolean; autoUncompleteOnExit?: boolean; autoSetStartDateOnEnter?: boolean }) => void;
   onDeleteList: () => void;
   onTaskClick: (taskId: string) => void;
 }
@@ -220,6 +220,13 @@ export function BoardList({
               <CircleOff className={cn('mr-2 h-4 w-4', list.autoUncompleteOnExit && 'text-amber-600')} />
               ここから出たら完了を外す
               {list.autoUncompleteOnExit && <span className="ml-auto text-xs text-amber-600">ON</span>}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onEditList({ autoSetStartDateOnEnter: !list.autoSetStartDateOnEnter })}
+            >
+              <CalendarPlus className={cn('mr-2 h-4 w-4', list.autoSetStartDateOnEnter && 'text-blue-600')} />
+              ここに入ったら開始日を設定
+              {list.autoSetStartDateOnEnter && <span className="ml-auto text-xs text-blue-600">ON</span>}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

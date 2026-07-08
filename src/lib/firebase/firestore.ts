@@ -52,6 +52,7 @@ function convertDoc<T>(doc: DocumentData, id: string): T {
     // Default values for List fields (for backward compatibility)
     autoCompleteOnEnter: data.autoCompleteOnEnter ?? false,
     autoUncompleteOnExit: data.autoUncompleteOnExit ?? false,
+    autoSetStartDateOnEnter: data.autoSetStartDateOnEnter ?? false,
     // Default values for Task fields (for backward compatibility)
     completedAt: data.completedAt ? toDate(data.completedAt) : null,
     isAbandoned: data.isAbandoned ?? false,

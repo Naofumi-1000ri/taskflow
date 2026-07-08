@@ -51,6 +51,7 @@ export interface List {
   order: number;
   autoCompleteOnEnter: boolean; // Mark tasks as complete when entering this list
   autoUncompleteOnExit: boolean; // Remove completion when tasks leave this list
+  autoSetStartDateOnEnter: boolean; // Set task startDate when entering this list (only if not already set)
   createdAt: Date;
   updatedAt: Date;
 }
