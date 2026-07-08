@@ -193,10 +193,12 @@ export function useBoard(projectId: string | null) {
 
   // Create task
   const addTask = useCallback(
-    async (listId: string, title: string, createdBy: string) => {
+    async (listId: string, title: string, createdBy: string, position: 'top' | 'bottom' = 'bottom') => {
       if (!projectId) return;
       const tasksInList = state.tasks.filter((t) => t.listId === listId);
-      const maxOrder = Math.max(...tasksInList.map((t) => t.order), -1);
+      const orders = tasksInList.map((t) => t.order);
+      const order =
+        position === 'top' ? Math.min(...orders, 1) - 1 : Math.max(...orders, -1) + 1;
 
       // Check if the target list has auto-complete enabled
       const targetList = state.lists.find((l) => l.id === listId);
@@ -206,7 +208,7 @@ export function useBoard(projectId: string | null) {
         listId,
         title,
         description: '',
-        order: maxOrder + 1,
+        order,
         assigneeIds: [],
         labelIds: [],
         tagIds: [],
