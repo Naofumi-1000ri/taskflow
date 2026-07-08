@@ -9,6 +9,7 @@ import {
   deleteProject,
   archiveProject,
   subscribeToUserProjects,
+  subscribeToArchivedUserProjects,
   reorderProjects,
   getProjectMembers,
   addProjectMember,
@@ -147,6 +148,70 @@ export function useProjects() {
     remove,
     archive,
     reorder,
+  };
+}
+
+export function useArchivedProjects() {
+  const { firebaseUser } = useAuthStore();
+  const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  // Subscribe to user's archived projects
+  useEffect(() => {
+    if (isE2EMockAuthEnabled()) {
+      Promise.resolve().then(() => {
+        setArchivedProjects([]);
+        setIsLoading(false);
+        setError(null);
+      });
+      return;
+    }
+
+    if (!firebaseUser) {
+      Promise.resolve().then(() => {
+        setArchivedProjects([]);
+        setIsLoading(false);
+      });
+      return;
+    }
+
+    Promise.resolve().then(() => {
+      setIsLoading(true);
+      setError(null);
+    });
+    const unsubscribe = subscribeToArchivedUserProjects(
+      firebaseUser.uid,
+      (projects) => {
+        setArchivedProjects(projects);
+        setIsLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error('[useArchivedProjects] Error:', err);
+        setError(err);
+        setIsLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [firebaseUser]);
+
+  // Restore (unarchive) project
+  const restore = useCallback(async (projectId: string) => {
+    try {
+      await archiveProject(projectId, false);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  }, []);
+
+  return {
+    archivedProjects,
+    isLoading,
+    error,
+    restore,
   };
 }
 

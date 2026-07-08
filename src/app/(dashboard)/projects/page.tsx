@@ -1,20 +1,27 @@
 'use client';
 
-import { Plus, FolderKanban } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, FolderKanban, Archive, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProjectCard } from '@/components/project/ProjectCard';
-import { useProjects } from '@/hooks/useProjects';
+import { useProjects, useArchivedProjects } from '@/hooks/useProjects';
 import { useUIStore } from '@/stores/uiStore';
 import { Loader2 } from 'lucide-react';
 
 export default function ProjectsPage() {
   const { projects, isLoading, archive, remove } = useProjects();
+  const { archivedProjects, restore } = useArchivedProjects();
   const { openProjectModal } = useUIStore();
+  const [showArchived, setShowArchived] = useState(false);
 
   const handleArchive = async (projectId: string) => {
     if (confirm('このプロジェクトをアーカイブしますか？')) {
       await archive(projectId, true);
     }
+  };
+
+  const handleRestore = async (projectId: string) => {
+    await restore(projectId);
   };
 
   const handleDelete = async (projectId: string) => {
@@ -72,6 +79,41 @@ export default function ProjectsPage() {
               onDelete={handleDelete}
             />
           ))}
+        </div>
+      )}
+
+      {archivedProjects.length > 0 && (
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => setShowArchived((prev) => !prev)}
+            className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            data-testid="toggle-archived-projects"
+          >
+            {showArchived ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+            <Archive className="h-4 w-4" />
+            アーカイブ済みプロジェクト（{archivedProjects.length}）
+          </button>
+
+          {showArchived && (
+            <div
+              className="grid gap-4 opacity-75 sm:grid-cols-2 lg:grid-cols-3"
+              data-testid="archived-projects-section"
+            >
+              {archivedProjects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onRestore={handleRestore}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
