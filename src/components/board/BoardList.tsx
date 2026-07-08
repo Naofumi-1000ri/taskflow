@@ -40,7 +40,7 @@ interface BoardListProps {
   allTasks: Task[]; // All tasks in project for dependency lookup
   labels: Label[];
   tags: Tag[];
-  onAddTask: (title: string) => void;
+  onAddTask: (title: string, position: 'top' | 'bottom') => void;
   onEditList: (data: { name?: string; color?: string; autoCompleteOnEnter?: boolean; autoUncompleteOnExit?: boolean }) => void;
   onDeleteList: () => void;
   onTaskClick: (taskId: string) => void;
@@ -93,8 +93,8 @@ export function BoardList({
   };
 
   const handleAddTask = () => {
-    if (newTaskTitle.trim()) {
-      onAddTask(newTaskTitle.trim());
+    if (newTaskTitle.trim() && taskComposerPosition) {
+      onAddTask(newTaskTitle.trim(), taskComposerPosition);
       closeTaskComposer();
     }
   };

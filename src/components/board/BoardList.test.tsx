@@ -97,7 +97,35 @@ describe('BoardList', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: '追加' }));
 
-    expect(onAddTask).toHaveBeenCalledWith('末尾で追加するタスク');
+    expect(onAddTask).toHaveBeenCalledWith('末尾で追加するタスク', 'bottom');
     expect(screen.getAllByRole('button', { name: 'タスクを追加' })).toHaveLength(2);
+  });
+
+  it('reports top position when launched from the top add button', () => {
+    const onAddTask = vi.fn();
+
+    render(
+      <BoardList
+        projectId="project-1"
+        list={list}
+        tasks={[task]}
+        allTasks={[task]}
+        labels={[]}
+        tags={[]}
+        onAddTask={onAddTask}
+        onEditList={vi.fn()}
+        onDeleteList={vi.fn()}
+        onTaskClick={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'タスクを追加' })[0]);
+
+    fireEvent.change(screen.getByPlaceholderText('タスク名を入力...'), {
+      target: { value: '先頭で追加するタスク' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '追加' }));
+
+    expect(onAddTask).toHaveBeenCalledWith('先頭で追加するタスク', 'top');
   });
 });

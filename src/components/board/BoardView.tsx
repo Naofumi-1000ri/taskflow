@@ -361,9 +361,9 @@ export function BoardView({ projectId, onTaskClick, filters }: BoardViewProps) {
     }
   };
 
-  const handleAddTask = (listId: string) => (title: string) => {
+  const handleAddTask = (listId: string) => (title: string, position: 'top' | 'bottom') => {
     if (firebaseUser) {
-      addTask(listId, title, firebaseUser.uid);
+      addTask(listId, title, firebaseUser.uid, position);
     }
   };
 
