@@ -24,6 +24,7 @@ interface AdminList {
   name: string;
   order: number;
   autoCompleteOnEnter?: boolean;
+  autoSetStartDateOnEnter?: boolean;
 }
 
 function omitUndefinedFields<T extends Record<string, unknown>>(data: T): T {
@@ -104,6 +105,7 @@ export interface ProjectListSummaryItem {
   order: number;
   autoCompleteOnEnter: boolean;
   autoUncompleteOnExit: boolean;
+  autoSetStartDateOnEnter: boolean;
 }
 
 export interface CreateProjectTaskInput {
@@ -255,6 +257,7 @@ async function getProjectListsInternal(projectId: string): Promise<AdminList[]> 
       name: typeof data.name === 'string' ? data.name : '',
       order: typeof data.order === 'number' ? data.order : 0,
       autoCompleteOnEnter: data.autoCompleteOnEnter === true,
+      autoSetStartDateOnEnter: data.autoSetStartDateOnEnter === true,
     };
   });
 }
@@ -272,6 +275,7 @@ export async function listProjectLists(projectId: string): Promise<ProjectListSu
       order: typeof data.order === 'number' ? data.order : 0,
       autoCompleteOnEnter: data.autoCompleteOnEnter === true,
       autoUncompleteOnExit: data.autoUncompleteOnExit === true,
+      autoSetStartDateOnEnter: data.autoSetStartDateOnEnter === true,
     };
   });
 }
@@ -467,6 +471,11 @@ export async function createProjectTask(
   const maxOrder = Math.max(...tasksInList.map((task) => task.order), -1);
   const shouldAutoComplete = targetList.autoCompleteOnEnter === true;
   const now = new Date();
+
+  // Set start date on enter (only if not already set)
+  if (targetList.autoSetStartDateOnEnter === true && !calculatedStartDate) {
+    calculatedStartDate = now;
+  }
 
   const taskData: Omit<Task, 'id' | 'projectId'> = {
     listId: input.listId,

@@ -114,6 +114,7 @@ export function useBoard(projectId: string | null) {
         order: maxOrder + 1,
         autoCompleteOnEnter: false,
         autoUncompleteOnExit: false,
+        autoSetStartDateOnEnter: false,
       });
       logActivity({
         projectId,
@@ -129,7 +130,7 @@ export function useBoard(projectId: string | null) {
 
   // Update list
   const editList = useCallback(
-    async (listId: string, data: { name?: string; color?: string; autoCompleteOnEnter?: boolean; autoUncompleteOnExit?: boolean }) => {
+    async (listId: string, data: { name?: string; color?: string; autoCompleteOnEnter?: boolean; autoUncompleteOnExit?: boolean; autoSetStartDateOnEnter?: boolean }) => {
       if (!projectId) return;
       await updateList(projectId, listId, data);
     },
@@ -168,6 +169,11 @@ export function useBoard(projectId: string | null) {
             updateData.completedAt = null;
           }
 
+          // Apply auto-set-start-date logic
+          if (targetList?.autoSetStartDateOnEnter && !task.startDate) {
+            updateData.startDate = new Date();
+          }
+
           return updateTask(projectId, task.id, updateData);
         });
         await Promise.all(moveUpdates);
@@ -203,6 +209,7 @@ export function useBoard(projectId: string | null) {
       // Check if the target list has auto-complete enabled
       const targetList = state.lists.find((l) => l.id === listId);
       const shouldAutoComplete = targetList?.autoCompleteOnEnter ?? false;
+      const shouldSetStartDate = targetList?.autoSetStartDateOnEnter ?? false;
 
       await createTask(projectId, {
         listId,
@@ -214,7 +221,7 @@ export function useBoard(projectId: string | null) {
         tagIds: [],
         dependsOnTaskIds: [],
         priority: null,
-        startDate: null,
+        startDate: shouldSetStartDate ? new Date() : null,
         dueDate: null,
         durationDays: null,
         isDueDateFixed: false,
@@ -409,6 +416,7 @@ export function useBoard(projectId: string | null) {
       const oldOrder = task?.order;
       const oldIsCompleted = task?.isCompleted;
       const oldCompletedAt = task?.completedAt;
+      const oldStartDate = task?.startDate;
 
       // Prepare update data
       const updateData: Partial<Task> = {
@@ -428,6 +436,10 @@ export function useBoard(projectId: string | null) {
           updateData.isCompleted = false;
           updateData.completedAt = null;
         }
+        // Set start date on enter (only if not already set)
+        if (newList?.autoSetStartDateOnEnter && !task.startDate) {
+          updateData.startDate = new Date();
+        }
       }
 
       await updateTask(projectId, taskId, updateData);
@@ -446,6 +458,7 @@ export function useBoard(projectId: string | null) {
               order: oldOrder,
               isCompleted: oldIsCompleted,
               completedAt: oldCompletedAt,
+              startDate: oldStartDate,
             });
           },
           redo: async () => {

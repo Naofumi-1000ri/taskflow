@@ -233,6 +233,7 @@ async function seedProject(db, uid, spec, projectOrder) {
       order: i,
       autoCompleteOnEnter: listSpec.name === '完了' || listSpec.name === 'リリース済み',
       autoUncompleteOnExit: false,
+      autoSetStartDateOnEnter: false,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
