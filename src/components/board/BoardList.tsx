@@ -292,6 +292,8 @@ export function BoardList({
                   key={task.id}
                   projectId={projectId}
                   task={task}
+                  listName={list.name}
+                  listColor={list.color}
                   labels={labels}
                   tags={tags}
                   allTasks={allTasks}
