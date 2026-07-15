@@ -158,6 +158,9 @@ export function BoardView({ projectId, onTaskClick, filters }: BoardViewProps) {
 
   // Use local lists for rendering (optimistic updates)
   const displayLists = localLists.length > 0 ? localLists : lists;
+  const activeTaskList = activeTask
+    ? displayLists.find((list) => list.id === activeTask.listId)
+    : null;
 
   // Delete list dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -519,6 +522,8 @@ export function BoardView({ projectId, onTaskClick, filters }: BoardViewProps) {
           <TaskCard
             projectId={projectId}
             task={activeTask}
+            listName={activeTaskList?.name ?? ''}
+            listColor={activeTaskList?.color ?? '#64748b'}
             labels={labels.filter((l) => activeTask.labelIds.includes(l.id))}
             tags={tags.filter((t) => activeTask.tagIds?.includes(t.id))}
             allTasks={tasks}

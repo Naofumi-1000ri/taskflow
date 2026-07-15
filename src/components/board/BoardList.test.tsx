@@ -26,14 +26,18 @@ vi.mock('@dnd-kit/core', () => ({
 vi.mock('./TaskCard', () => ({
   TaskCard: ({
     task,
+    listName,
+    listColor,
     onClick,
     onMove,
   }: {
     task: Task;
+    listName: string;
+    listColor: string;
     onClick: () => void;
     onMove: (listId: string) => void;
   }) => (
-    <div>
+    <div data-testid="mock-task-card" data-list-name={listName} data-list-color={listColor}>
       <button onClick={onClick}>{task.title}</button>
       <button onClick={() => onMove('list-2')}>別の看板へ移動</button>
     </div>
@@ -81,6 +85,28 @@ const task: Task = {
 };
 
 describe('BoardList', () => {
+  it('passes the list status presentation to each task card', () => {
+    render(
+      <BoardList
+        projectId="project-1"
+        list={list}
+        tasks={[task]}
+        allTasks={[task]}
+        labels={[]}
+        tags={[]}
+        onAddTask={vi.fn()}
+        onEditList={vi.fn()}
+        onDeleteList={vi.fn()}
+        onTaskClick={vi.fn()}
+        allLists={[list]}
+        onTaskMove={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('mock-task-card')).toHaveAttribute('data-list-name', '依頼事項');
+    expect(screen.getByTestId('mock-task-card')).toHaveAttribute('data-list-color', '#8b5cf6');
+  });
+
   it('keeps the task composer at the bottom when launched from the bottom add button', () => {
     const onAddTask = vi.fn();
 
