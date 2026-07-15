@@ -44,6 +44,8 @@ interface BoardListProps {
   onEditList: (data: { name?: string; color?: string; autoCompleteOnEnter?: boolean; autoUncompleteOnExit?: boolean; autoSetStartDateOnEnter?: boolean }) => void;
   onDeleteList: () => void;
   onTaskClick: (taskId: string) => void;
+  allLists: List[];
+  onTaskMove: (taskId: string, listId: string) => void;
 }
 
 export function BoardList({
@@ -57,6 +59,8 @@ export function BoardList({
   onEditList,
   onDeleteList,
   onTaskClick,
+  allLists,
+  onTaskMove,
 }: BoardListProps) {
   const [taskComposerPosition, setTaskComposerPosition] = useState<'top' | 'bottom' | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -296,6 +300,8 @@ export function BoardList({
                   tags={tags}
                   allTasks={allTasks}
                   onClick={() => onTaskClick(task.id)}
+                  lists={allLists}
+                  onMove={(targetListId) => onTaskMove(task.id, targetListId)}
                 />
               ))}
             </SortableContext>

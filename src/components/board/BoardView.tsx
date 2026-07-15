@@ -367,6 +367,14 @@ export function BoardView({ projectId, onTaskClick, filters }: BoardViewProps) {
     }
   };
 
+  const handleTaskMove = useCallback(
+    (taskId: string, targetListId: string) => {
+      const tasksInTargetList = getTasksByListId(targetListId);
+      moveTask(taskId, targetListId, tasksInTargetList.length);
+    },
+    [getTasksByListId, moveTask]
+  );
+
   const handleDeleteListRequest = (list: List) => {
     const tasksInList = getTasksByListId(list.id);
     if (tasksInList.length === 0) {
@@ -435,6 +443,8 @@ export function BoardView({ projectId, onTaskClick, filters }: BoardViewProps) {
                 onEditList={(data) => editList(list.id, data)}
                 onDeleteList={() => handleDeleteListRequest(list)}
                 onTaskClick={onTaskClick}
+                allLists={displayLists}
+                onTaskMove={handleTaskMove}
               />
             ))}
           </SortableContext>
