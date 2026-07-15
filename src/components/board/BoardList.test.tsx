@@ -24,9 +24,22 @@ vi.mock('@dnd-kit/core', () => ({
 }));
 
 vi.mock('./TaskCard', () => ({
-  TaskCard: ({ task, listName, listColor }: { task: Task; listName: string; listColor: string }) => (
+  TaskCard: ({
+    task,
+    listName,
+    listColor,
+    onClick,
+    onMove,
+  }: {
+    task: Task;
+    listName: string;
+    listColor: string;
+    onClick: () => void;
+    onMove: (listId: string) => void;
+  }) => (
     <div data-testid="mock-task-card" data-list-name={listName} data-list-color={listColor}>
-      {task.title}
+      <button onClick={onClick}>{task.title}</button>
+      <button onClick={() => onMove('list-2')}>別の看板へ移動</button>
     </div>
   ),
 }));
@@ -85,6 +98,8 @@ describe('BoardList', () => {
         onEditList={vi.fn()}
         onDeleteList={vi.fn()}
         onTaskClick={vi.fn()}
+        allLists={[list]}
+        onTaskMove={vi.fn()}
       />
     );
 
@@ -107,6 +122,8 @@ describe('BoardList', () => {
         onEditList={vi.fn()}
         onDeleteList={vi.fn()}
         onTaskClick={vi.fn()}
+        allLists={[list]}
+        onTaskMove={vi.fn()}
       />
     );
 
@@ -141,6 +158,8 @@ describe('BoardList', () => {
         onEditList={vi.fn()}
         onDeleteList={vi.fn()}
         onTaskClick={vi.fn()}
+        allLists={[list]}
+        onTaskMove={vi.fn()}
       />
     );
 
@@ -152,5 +171,33 @@ describe('BoardList', () => {
     fireEvent.click(screen.getByRole('button', { name: '追加' }));
 
     expect(onAddTask).toHaveBeenCalledWith('先頭で追加するタスク', 'top');
+  });
+
+  it('keeps normal task clicks and routes context-menu moves with the task id', () => {
+    const onTaskClick = vi.fn();
+    const onTaskMove = vi.fn();
+
+    render(
+      <BoardList
+        projectId="project-1"
+        list={list}
+        tasks={[task]}
+        allTasks={[task]}
+        labels={[]}
+        tags={[]}
+        onAddTask={vi.fn()}
+        onEditList={vi.fn()}
+        onDeleteList={vi.fn()}
+        onTaskClick={onTaskClick}
+        allLists={[list]}
+        onTaskMove={onTaskMove}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '既存タスク' }));
+    fireEvent.click(screen.getByRole('button', { name: '別の看板へ移動' }));
+
+    expect(onTaskClick).toHaveBeenCalledWith('task-1');
+    expect(onTaskMove).toHaveBeenCalledWith('task-1', 'list-2');
   });
 });

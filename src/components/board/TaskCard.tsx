@@ -6,7 +6,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { AlertTriangle, Calendar, Bell, CheckCircle2, Clock, Link2 } from 'lucide-react';
+import { AlertTriangle, Calendar, Bell, CheckCircle2, Clock, Link2, MoveRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -21,10 +21,19 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { cn } from '@/lib/utils';
 import { getUsersByIds, getTaskAttachments, getProject } from '@/lib/firebase/firestore';
 import { useNotifications } from '@/hooks/useNotifications';
-import type { Task, Label, Tag, User as UserType, Attachment } from '@/types';
+import type { Task, Label, Tag, User as UserType, Attachment, List } from '@/types';
 import { isTaskOverdue, getEffectiveDates } from '@/lib/utils/task';
 
 interface TaskCardProps {
@@ -36,10 +45,12 @@ interface TaskCardProps {
   tags: Tag[];
   allTasks?: Task[]; // For dependency lookup
   onClick: () => void;
+  lists?: List[];
+  onMove?: (listId: string) => void;
   isDragging?: boolean;
 }
 
-export function TaskCard({ projectId, task, listName, listColor, labels, tags, allTasks, onClick, isDragging }: TaskCardProps) {
+export function TaskCard({ projectId, task, listName, listColor, labels, tags, allTasks, onClick, lists = [], onMove, isDragging }: TaskCardProps) {
   const [assignees, setAssignees] = useState<UserType[]>([]);
   const [imageAttachments, setImageAttachments] = useState<Attachment[]>([]);
   const [bellMessage, setBellMessage] = useState('');
@@ -149,6 +160,7 @@ export function TaskCard({ projectId, task, listName, listColor, labels, tags, a
       .slice(0, 2);
   };
 
+  const moveTargets = lists.filter((list) => list.id !== task.listId);
   const hasDateRail = Boolean(task.startDate || task.dueDate);
   const hasHoverDetails = Boolean(
     task.description ||
@@ -349,11 +361,7 @@ export function TaskCard({ projectId, task, listName, listColor, labels, tags, a
     </div>
   );
 
-  if (!hasHoverDetails || isDragging || isSortableDragging) {
-    return card;
-  }
-
-  return (
+  const cardWithDetails = !hasHoverDetails || isDragging || isSortableDragging ? card : (
     <Tooltip>
       <TooltipTrigger asChild>{card}</TooltipTrigger>
       <TooltipContent side="top" sideOffset={8} className="w-72 max-w-[calc(100vw-2rem)] space-y-2 px-3 py-2.5 text-left text-xs text-balance">
@@ -444,5 +452,32 @@ export function TaskCard({ projectId, task, listName, listColor, labels, tags, a
         )}
       </TooltipContent>
     </Tooltip>
+  );
+
+  if (!onMove || moveTargets.length === 0 || isDragging || isSortableDragging) {
+    return cardWithDetails;
+  }
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className="contents">{cardWithDetails}</div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <MoveRight className="mr-2 h-4 w-4" />
+            移動
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            {moveTargets.map((list) => (
+              <ContextMenuItem key={list.id} onSelect={() => onMove(list.id)}>
+                {list.name}
+              </ContextMenuItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
