@@ -24,7 +24,11 @@ vi.mock('@dnd-kit/core', () => ({
 }));
 
 vi.mock('./TaskCard', () => ({
-  TaskCard: ({ task }: { task: Task }) => <div>{task.title}</div>,
+  TaskCard: ({ task, listName, listColor }: { task: Task; listName: string; listColor: string }) => (
+    <div data-testid="mock-task-card" data-list-name={listName} data-list-color={listColor}>
+      {task.title}
+    </div>
+  ),
 }));
 
 const list: List = {
@@ -68,6 +72,26 @@ const task: Task = {
 };
 
 describe('BoardList', () => {
+  it('passes the list status presentation to each task card', () => {
+    render(
+      <BoardList
+        projectId="project-1"
+        list={list}
+        tasks={[task]}
+        allTasks={[task]}
+        labels={[]}
+        tags={[]}
+        onAddTask={vi.fn()}
+        onEditList={vi.fn()}
+        onDeleteList={vi.fn()}
+        onTaskClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('mock-task-card')).toHaveAttribute('data-list-name', '依頼事項');
+    expect(screen.getByTestId('mock-task-card')).toHaveAttribute('data-list-color', '#8b5cf6');
+  });
+
   it('keeps the task composer at the bottom when launched from the bottom add button', () => {
     const onAddTask = vi.fn();
 
