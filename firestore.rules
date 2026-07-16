@@ -71,8 +71,10 @@ service cloud.firestore {
                      (isAllowedUser() && request.auth.uid in resource.data.memberIds);
       // プロジェクトの作成は許可ドメインの全ユーザー
       allow create: if isAllowedUser();
-      // プロジェクトの更新・削除はメンバーのみ
-      allow update, delete: if canAccessProject(projectId);
+      // プロジェクトの更新はメンバーのみ
+      allow update: if canAccessProject(projectId);
+      // 誤削除防止のため、削除はアーカイブ済みプロジェクトに限定
+      allow delete: if canAccessProject(projectId) && resource.data.isArchived == true;
 
       // メンバー管理
       match /members/{memberId} {

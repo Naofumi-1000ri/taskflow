@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useProject } from '@/hooks/useProjects';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,8 +46,9 @@ const PROJECT_ICONS = ['📁', '🚀', '💼', '🎯', '📊', '🔧', '💡', '
 
 export default function ProjectSettingsPage() {
   const params = useParams();
+  const router = useRouter();
   const projectId = params.projectId as string;
-  const { project, members, isLoading, update, addMember, removeMember, updateRole } = useProject(projectId);
+  const { project, members, isLoading, update, archive, remove, addMember, removeMember, updateRole } = useProject(projectId);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -55,6 +56,8 @@ export default function ProjectSettingsPage() {
   const [icon, setIcon] = useState('');
   const [iconUrl, setIconUrl] = useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
   const [isUploadingIcon, setIsUploadingIcon] = useState(false);
   const [isPreparingIconCrop, setIsPreparingIconCrop] = useState(false);
   const [cropperOpen, setCropperOpen] = useState(false);
@@ -365,6 +368,37 @@ export default function ProjectSettingsPage() {
       alert('タスクの削除に失敗しました');
     } finally {
       setDeletingTaskId(null);
+    }
+  };
+
+  const handleArchiveProject = async () => {
+    if (!confirm('このプロジェクトをアーカイブしますか？')) return;
+
+    setIsArchiving(true);
+    try {
+      await archive();
+      router.push('/projects');
+    } catch (error) {
+      console.error('Failed to archive project:', error);
+      alert('プロジェクトのアーカイブに失敗しました');
+    } finally {
+      setIsArchiving(false);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!project.isArchived) return;
+    if (!confirm('このプロジェクトを完全に削除しますか？この操作は取り消せません。')) return;
+
+    setIsDeletingProject(true);
+    try {
+      await remove();
+      router.push('/projects');
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+      alert('プロジェクトの削除に失敗しました');
+    } finally {
+      setIsDeletingProject(false);
     }
   };
 
@@ -922,18 +956,35 @@ export default function ProjectSettingsPage() {
                   プロジェクトを非表示にします
                 </p>
               </div>
-              <Button variant="outline">アーカイブ</Button>
+              <Button
+                variant="outline"
+                onClick={handleArchiveProject}
+                disabled={isArchiving || project.isArchived}
+              >
+                {isArchiving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {project.isArchived ? 'アーカイブ済み' : 'アーカイブ'}
+              </Button>
             </div>
             <Separator />
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-red-600">プロジェクトを削除</p>
                 <p className="text-sm text-muted-foreground">
-                  プロジェクトとすべてのデータが完全に削除されます
+                  {project.isArchived
+                    ? 'プロジェクトとすべてのデータが完全に削除されます'
+                    : '削除するには先にプロジェクトをアーカイブしてください'}
                 </p>
               </div>
-              <Button variant="destructive">
-                <Trash2 className="mr-2 h-4 w-4" />
+              <Button
+                variant="destructive"
+                onClick={handleDeleteProject}
+                disabled={!project.isArchived || isDeletingProject}
+              >
+                {isDeletingProject ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-2 h-4 w-4" />
+                )}
                 削除
               </Button>
             </div>

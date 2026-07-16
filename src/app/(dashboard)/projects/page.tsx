@@ -76,7 +76,6 @@ export default function ProjectsPage() {
               key={project.id}
               project={project}
               onArchive={handleArchive}
-              onDelete={handleDelete}
             />
           ))}
         </div>

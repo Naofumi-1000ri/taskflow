@@ -81,6 +81,8 @@
     "vitest": "^4.0.18"
   },
   "overrides": {
-    "@tootallnate/once": "3.0.1"
+    "@tootallnate/once": "3.0.1",
+    "postcss": "8.5.14",
+    "websocket-driver": "0.7.5"
   }
 }

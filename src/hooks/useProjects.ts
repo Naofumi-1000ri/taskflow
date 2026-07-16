@@ -284,6 +284,28 @@ export function useProject(projectId: string | null) {
     [projectId]
   );
 
+  // Archive project (real-time subscription will handle state updates)
+  const archive = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      await archiveProject(projectId, true);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  }, [projectId]);
+
+  // Delete an archived project
+  const remove = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      await deleteProject(projectId);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  }, [projectId]);
+
   // Add member
   const addMember = useCallback(
     async (userId: string, role: ProjectRole) => {
@@ -338,6 +360,8 @@ export function useProject(projectId: string | null) {
     isLoading,
     error,
     update,
+    archive,
+    remove,
     addMember,
     removeMember,
     updateRole,
