@@ -101,13 +101,15 @@ export function ProjectCard({
                 アーカイブ
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem
-              onClick={() => onDelete?.(project.id)}
-              className="text-red-600"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              削除
-            </DropdownMenuItem>
+            {project.isArchived && onDelete && (
+              <DropdownMenuItem
+                onClick={() => onDelete(project.id)}
+                className="text-red-600"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                削除
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </CardHeader>

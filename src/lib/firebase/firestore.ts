@@ -193,8 +193,15 @@ export async function updateProject(
 
 export async function deleteProject(projectId: string): Promise<void> {
   const db = getFirebaseDb();
+  const projectRef = doc(db, 'projects', projectId);
+  const projectSnapshot = await getDoc(projectRef);
+
+  if (projectSnapshot.exists() && projectSnapshot.data().isArchived !== true) {
+    throw new Error('プロジェクトを削除するには先にアーカイブしてください');
+  }
+
   // Note: In production, use Cloud Functions to cascade delete subcollections
-  await deleteDoc(doc(db, 'projects', projectId));
+  await deleteDoc(projectRef);
 }
 
 export async function archiveProject(
